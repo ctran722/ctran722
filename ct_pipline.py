@@ -1,14 +1,28 @@
 #create array
 Color_Array= ["Red","Blue","Green"]
 
-# create function
-def call()
-    
+color1=Color_Array[0]
+color2=Color_Array[1]
+color3=Color_Array[2]
 
-# r=Color_Array[0]
-# Def
 
-# for loop to go through array
-for t in Color_Array:
-    print(t)
+# create function to call
+def f1():
+    print("Red Called")
 
+def f2():
+    print("Green Called")
+
+# create dictionary
+color = {}
+
+# add cikirs ub ductuibary
+color["Red"] = f1
+color["Green"] = f2
+
+# create loop to search for color and call
+for fn in color:
+    print(fn)
+    color[fn]()
+
+print("Done")
