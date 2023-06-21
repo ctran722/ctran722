@@ -16,7 +16,7 @@ def f2():
 # create dictionary
 color = {}
 
-# add cikirs ub ductuibary
+# add colors in dictionary
 color["Red"] = f1
 color["Green"] = f2
 
@@ -26,3 +26,7 @@ for fn in color:
     color[fn]()
 
 print("Done")
+
+#add class and definition
+#edge cases
+# add stats at the end?
