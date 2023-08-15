@@ -1,0 +1,326 @@
+# import necessary tools for script
+import pandas as pd,numpy as np,glob,numpy, matplotlib.pyplot as plt, seaborn as sns,os
+from sklearn.cluster import KMeans
+from scipy.spatial.distance import cdist
+from copy import deepcopy
+
+# setting variables for coding
+# used glob glob to pull all txt files in diversityScores directory
+file1=glob.glob('diversityScores/*.txt')
+# Numpy as np,statistics
+file='clinical_data.txt'
+# print statement to show coder where script is at and sanity check
+print('Pulling %s data and calculating the averages and standard deviations of each species' %(file))
+table = pd.read_csv(file, sep=" ", delimiter = "\t")
+# print(table)
+# creating dictionary for addition to columns in data frame
+Average=[]
+STDev=[]
+# loop created to find the mean and standard deviation within the clinical_data.txt
+for files in file1:
+    # opening clinical_data.txt
+    reader= open(files).read().splitlines()
+    # making array of numbers a float
+    number=(np.array(reader, float))
+    # creating the mean of each data set
+    mean=numpy.mean(number)
+    # creating standard deviation of each data set
+    std=numpy.std(number)
+    # print statement to show coder where script is at and sanity check
+    # print(files)
+    # print(mean)
+    # print(std)
+    Average.append(mean)
+    STDev.append(std)
+    # print statement to show coder where script is at and sanity check
+    # print(Average)
+    # print(STDev)
+table['Averages']= Average
+table['STDev']=STDev
+# print statement to show coder where script is at and sanity check
+# print(table['Average'].nlargest(2))
+f=open('clinical_data.stats.txt','w' )
+f.write(str(table))
+# print statement to show coder where script is at and sanity check
+print("Below is %s table with added columns named 'Averages' and 'STDev':\n"%(file), str(table))
+# print statement to show coder where script is at and sanity check
+# print(table)
+# locating the 2 highest averages in data set
+print("Located the two highest averages from the table. Below is the list of the highest averages with in the data\n", table.nlargest(2,['Averages']))
+# locating the smallest average in the data set
+# print statement to show coder where script is at and sanity check
+print("Located the smallest average from the table. Below is the list of the smallest averages with in the data\n", table.nsmallest(1,['Averages']))
+
+# printing to locate code name of two of the highest and  one lowest average
+print("Confirmed that",table.nlargest(2,['Averages']).values[0][5], "has the highest average within the data")
+print("Confirmed that",table.nlargest(2,['Averages']).values[-1][5], "has the second highest average within the data")
+print("Confirmed that",table.nsmallest(1,['Averages']).values[0][5],"has the smallest average within the data")
+#set varaibles to locate code name of file
+hcodename=table.nlargest(2,['Averages']).values[0][5]
+scodename=table.nlargest(2,['Averages']).values[-1][5]
+lcodename=table.nsmallest(1,['Averages']).values[0][5]
+#set varibales to locate files
+hfile='distanceFiles/%s.distance.txt' %(hcodename)
+sfile='distanceFiles/%s.distance.txt'%(scodename)
+lfile='distanceFiles/%s.distance.txt'%(lcodename)
+hplot= np.loadtxt(hfile, delimiter=',', unpack=True)
+splot= np.loadtxt(sfile, delimiter=',', unpack=True)
+lplot= np.loadtxt(lfile, delimiter=',', unpack=True)
+check_folder=os.path.isdir(hcodename)
+check_folder2=os.path.isdir(scodename)
+check_folder3=os.path.isdir(lcodename)
+
+# creating directories for designated species
+if not check_folder:
+    os.mkdir(hcodename)
+    print(hcodename, 'Directory has been created.')
+else:
+    print(hcodename, 'Directory already exists.')
+
+if not check_folder2:
+    os.mkdir(scodename)
+    print(scodename, 'Directory has been created.')
+else:
+    print(scodename, 'Directory already exists.')
+
+if not check_folder3:
+    os.mkdir(lcodename)
+    print(lcodename, 'Directory has been created.')
+else:
+    print(lcodename, 'Directory already exists.')
+
+codename={hcodename, scodename, lcodename}
+
+for name in codename:
+    # print(name)
+    # print statement to show coder where script is at and sanity check
+    print("creating %s scatterplot" %(name))
+    # creating scatterplot for highest average
+    # setting variable for X and Y axis for plot
+    X, Y = np.loadtxt('distanceFiles/%s.distance.txt'%(name), delimiter=',', unpack=True)
+    # creating seaborn scatterplot
+    sns.scatterplot(X ,Y)
+    # creating title for graph
+    plt.title(name)
+    # creating x label
+    # plt.xlabel('X')
+    # creating y label
+    # plt.ylabel('Y')
+    # this was to show the figure, but this was not working within python so this was viewed after the script was run throughn the save fig
+    # plt.show()
+    # saving file of graph
+    plt.savefig('%s/%s.PNG'%(name,name))
+    # clearing plot to creat another graph
+    plt.clf()
+    # print statement to show coder where script is at and sanity check
+    print("%s scatterplot complete"%(name))
+
+    # print statement to show coder where script is at and sanity check
+    print('creating %s elbow method graph'%(name))
+    plt.plot()
+    # appending values in array
+    X1 = np.array(list(zip(X, Y))).reshape(len(X), 2)
+    # designating dictionaries
+    colors = ['b', 'g', 'r']
+    markers = ['o', 'v', 's']
+
+    # k means determine k
+    #creating dictionaries
+    distortions = []
+    # finding k means and appending it into dictionary
+    K = range(1,10)
+    for k in K:
+        kmeanModel = KMeans(n_clusters=k).fit(X1)
+        kmeanModel.fit(X1)
+        distortions.append(sum(np.min(cdist(X1, kmeanModel.cluster_centers_, 'euclidean'), axis=1)) / X1.shape[0])
+
+    # Plot the elbow method graph
+    plt.plot(K, distortions, 'bx-')
+    # labeling x axis
+    plt.xlabel('k')
+    # labeling y axis
+    plt.ylabel('Distortion')
+    # creating title for graph
+    plt.title('Elbow method of %s'%(name))
+    # this was to show the figure, but this was not working within python so this was viewed after the script was run throughn the save fig
+    # plt.show()
+    # saving file of graph
+    plt.savefig('%s/%s_elbow.PNG'%(name,name))
+    # clearing plot to creat another graph
+    plt.clf()
+    # print statement to show coder where script is at and sanity check
+    print('%s elbow method graph complete'%(name))
+
+
+# creating first k mean cluster plot for highest average
+# print statement to show coder where script is at and sanity check
+print('creating %s k means cluster graph'%(hcodename))
+# setting variable for X and Y axis for plot
+hf1,hf2 = hplot
+# appending values in array
+X = np.array(list(zip(hf1, hf2))).reshape(len(hf1), 2)
+# creating scatter plot 
+plt.scatter(hf1, hf2, c='black', s=7)
+def dist(a, b, ax=1):
+    return np.linalg.norm(a - b, axis=ax)
+# Number of clusters
+# K can be adjusted here by the elbow method of species
+k = 2
+# X coordinates of random centroids
+C_x = np.random.randint(0, np.max(X), size=k)
+# Y coordinates of random centroids
+C_y = np.random.randint(0, np.max(X), size=k)
+C = np.array(list(zip(C_x, C_y)), dtype=np.float32)
+# print(C)
+plt.scatter(hf1, hf2, c='#050505', s=7)
+plt.scatter(C_x, C_y, marker='*', s=200, c='g')
+# To store the value of centroids when it updates
+C_old = np.zeros(C.shape)
+# Cluster Lables(0, 1, 2)
+clusters = np.zeros(len(X))
+# Error func. - Distance between new centroids and old centroids
+error = dist(C, C_old, None)
+# Loop will run till the error becomes zero
+while error != 0:
+    # Assigning each value to its closest cluster
+    for i in range(len(X)):
+        distances = dist(X[i], C)
+        cluster = np.argmin(distances)
+        clusters[i] = cluster
+    # Storing the old centroid values
+    C_old = deepcopy(C)
+    # Finding the new centroids by taking the average value
+    for i in range(k):
+        points = [X[j] for j in range(len(X)) if clusters[j] == i]
+        C[i] = np.mean(points, axis=0)
+    error = dist(C, C_old, None)
+    colors = ['r', 'g', 'b', 'y', 'c', 'm']
+fig, ax = plt.subplots()
+for i in range(k):
+        points = np.array([X[j] for j in range(len(X)) if clusters[j] == i])
+        ax.scatter(points[:, 0], points[:, 1], s=7, c=colors[i])
+ax.scatter(C[:, 0], C[:, 1], marker='*', s=200, c='#050505')
+# creating title for graph
+plt.title('%s cluster mean'%(hcodename))
+# saving file of graph
+plt.savefig('%s/%s_cluster.PNG'%(hcodename,hcodename))
+# clearing plot to creat another graph
+plt.clf()
+# print statement to show coder where script is at and sanity check
+print('%s k means cluster graph complete'%(hcodename))
+
+
+# creating  k mean cluster plot for second highest average
+# print statement to show coder where script is at and sanity check
+print('creating %s k mean cluster graph'%(scodename))
+# setting variable for X and Y axis for plot
+sf1,sf2 = splot
+# appending values in array
+X = np.array(list(zip(sf1, sf2))).reshape(len(sf1), 2)
+# creating scatter plot 
+plt.scatter(sf1, sf2, c='black', s=7)
+def dist(a, b, ax=1):
+    return np.linalg.norm(a - b, axis=ax)
+# Number of clusters
+# K can be adjusted here by the elbow method of species
+k = 3
+# X coordinates of random centroids
+C_x = np.random.randint(0, np.max(X), size=k)
+# Y coordinates of random centroids
+C_y = np.random.randint(0, np.max(X), size=k)
+C = np.array(list(zip(C_x, C_y)), dtype=np.float32)
+# print(C)
+plt.scatter(sf1, sf2, c='#050505', s=7)
+plt.scatter(C_x, C_y, marker='*', s=200, c='g')
+# To store the value of centroids when it updates
+C_old = np.zeros(C.shape)
+# Cluster Lables(0, 1, 2)
+clusters = np.zeros(len(X))
+# Error func. - Distance between new centroids and old centroids
+error = dist(C, C_old, None)
+# Loop will run till the error becomes zero
+while error != 0:
+    # Assigning each value to its closest cluster
+    for i in range(len(X)):
+        distances = dist(X[i], C)
+        cluster = np.argmin(distances)
+        clusters[i] = cluster
+    # Storing the old centroid values
+    C_old = deepcopy(C)
+    # Finding the new centroids by taking the average value
+    for i in range(k):
+        points = [X[j] for j in range(len(X)) if clusters[j] == i]
+        C[i] = np.mean(points, axis=0)
+    error = dist(C, C_old, None)
+    colors = ['r', 'g', 'b', 'y', 'c', 'm']
+fig, ax = plt.subplots()
+for i in range(k):
+        points = np.array([X[j] for j in range(len(X)) if clusters[j] == i])
+        ax.scatter(points[:, 0], points[:, 1], s=7, c=colors[i])
+ax.scatter(C[:, 0], C[:, 1], marker='*', s=200, c='#050505')
+# creating title for k mean cluster graph
+plt.title('%s cluster mean'%(scodename))
+# saving file of graph
+plt.savefig('%s/%s_cluster.PNG'%(scodename,scodename))
+# clearing plote
+plt.clf()
+# print statement to show coder where script is at and sanity check
+print('%s k mean cluster graph complete'%(scodename))
+
+
+# creating  k mean cluster plot for smallest average
+# print statement to show coder where script is at and sanity check
+print('creating %s k means cluster graph'%(lcodename))
+# setting variable for X and Y axis for plot
+lf1,lf2 = lplot
+# appending values in array
+X = np.array(list(zip(lf1, lf2))).reshape(len(lf1), 2)
+# creating scatter plot 
+plt.scatter(lf1, lf2, c='black', s=7)
+def dist(a, b, ax=1):
+    return np.linalg.norm(a - b, axis=ax)
+# Number of clusters
+# K can be adjusted here by the elbow method of species
+k = 4
+# X coordinates of random centroids
+C_x = np.random.randint(0, np.max(X), size=k)
+# Y coordinates of random centroids
+C_y = np.random.randint(0, np.max(X), size=k)
+C = np.array(list(zip(C_x, C_y)), dtype=np.float32)
+# print(C)
+plt.scatter(lf1, lf2, c='#050505', s=7)
+plt.scatter(C_x, C_y, marker='*', s=200, c='g')
+# To store the value of centroids when it updates
+C_old = np.zeros(C.shape)
+# Cluster Lables(0, 1, 2)
+clusters = np.zeros(len(X))
+# Error func. - Distance between new centroids and old centroids
+error = dist(C, C_old, None)
+# Loop will run till the error becomes zero
+while error != 0:
+    # Assigning each value to its closest cluster
+    for i in range(len(X)):
+        distances = dist(X[i], C)
+        cluster = np.argmin(distances)
+        clusters[i] = cluster
+    # Storing the old centroid values
+    C_old = deepcopy(C)
+    # Finding the new centroids by taking the average value
+    for i in range(k):
+        points = [X[j] for j in range(len(X)) if clusters[j] == i]
+        C[i] = np.mean(points, axis=0)
+    error = dist(C, C_old, None)
+    colors = ['r', 'g', 'b', 'y', 'c', 'm']
+fig, ax = plt.subplots()
+for i in range(k):
+        points = np.array([X[j] for j in range(len(X)) if clusters[j] == i])
+        ax.scatter(points[:, 0], points[:, 1], s=7, c=colors[i])
+ax.scatter(C[:, 0], C[:, 1], marker='*', s=200, c='#050505')
+# creating title for graph
+plt.title('%s cluster mean'%(lcodename))
+# saving file of graph
+plt.savefig('%s/%s_cluster.PNG'%(lcodename,lcodename))
+# clearing plot to creat another graph
+plt.clf()
+# print statement to show coder where script is at and sanity check
+print('%s k means cluster graph complete\nAnalysis complete'%(lcodename))

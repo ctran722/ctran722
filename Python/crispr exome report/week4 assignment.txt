@@ -1,0 +1,382 @@
+#!/bin/bash
+filename='interesting_motifs.txt'
+
+#Loop, print and transfer motif counts to .txt file
+touch motif_count.txt
+while read line; do
+echo "$line occurrences : $(grep -oc $line r_bifella.fasta)" >> motif_count.txt
+echo "$line occurrences : $(grep -oc $line r_bifella.fasta)"
+done < $filename
+
+CTTCAAAATCTC
+grep -oc CTTCAAAATCTC r_bifella.fasta
+
+do
+    fir=`echo $LINE|awk '{print $2}'`
+    sec=`echo $LINE|awk '{print $3}'`
+    if [ $fir -gt $max ]; then
+       max=$fir
+    fi
+    if [ $sec -gt $max ];then
+        max=$sec
+    fi
+
+
+
+#Create corresponding sequences of genes to .fasta file
+touch $line.fasta
+while read line; do
+grep -ie $line -ie gene r_bifella.fasta >> $line.fasta
+done < $filename
+
+#Create and move .fasta files to folder
+mkdir -p 'motifs'
+while read line; do
+mv $line.fasta motifs
+done <$filename
+
+
+awk '{print $1}' clinical_data.txt
+
+awk '{ print $1, $2, $3, $4, $5, $6, $7, "8" }' clinical_data.txt
+
+grep -o -i line | awk '{ print $1, $2, $3, $4, $5, $6, $7 }' clinical_data.txt
+
+awk '{print $1" "$2" "$3" "$4" "$5" "$6" "$7" "$8}' clinical_data.txt
+
+#using tab 
+sed 's/||/| |/g;s/||/| |/g' filename-here | column -s"|" -t | less -#2 -N -S
+
+#makes columns slightly alligned in output
+grep -v "^#" Mus_musculus.GRCm38.75_chr1.gtf | cut -f1-8 | head -n3
+
+grep -v "^#" clinical_data.txt | cut -f 1-8 | column -t
+
+#change file
+ sed -i 's/Not sequenced/Not_sequenced/g' dataset1.txt
+ 
+ history > script0427.txt
+ 
+ https://ryanstutorials.net/linuxtutorial/cheatsheetgrep.php
+
+wc -l
+tail -n
+
+sed -ie 's/Not sequenced/Not_sequenced/g' -ie 's/New Jersey/New_Jersey/g' -ie 's/Staten Island/Staten_Island/g' ie 's/Diamater (mm)/Diameter_(mm)/g' .txt
+#works for only 2
+sed 's/Not sequenced/Not_sequenced/;s/New Jersey/New_Jersey/g' dataset.txt
+#worked for 4
+sed 's/Not sequenced/Not_sequenced/;s/New Jersey/New_Jersey/;s/Staten Island/Staten_Island/;s/Diamater (mm)/Diameter_(mm)/g' dataset.txt
+
+~
+# in between 20-30 in column 3
+awk '{if ($3>=20 && $3<=30)print $0 }' dataset1.txt
+# in between 20-30 in column 3 and equals word in column 5
+awk '{if ($5 ~ /Sequenced/ && $3>=20 && $3<=30)print $0 }' dataset1.txt
+
+awk 'NR == 1 || $3 < min {line = $0; min = $3}END{print line}' .txt
+
+echo "$line occurances: $(fgrep -of $line exomes/*.fasta | sort | uniq -c )"
+
+fgrep -of exomes/*.fasta exome_motif_occurance.fasta | sort | uniq -c | awk '{print $2 " " $1}'
+
+fgrep -of motif_list.txt exomes/*.fasta exome_motif_occurance.fasta | sort | uniq -c |sort -nr |awk '{print $2 " " $1}' > topmotifs.fasta
+
+
+awk '{if ($2>=max && $2>=max && $2>=max )print $0 }' topmotifs.fasta| sort -nr |
+
+sed -i 's//Not_sequenced/g' dataset1.txt/awk column/ head -n3  >$line. fasta
+
+
+#!/bin/bash
+
+#creating directory to store files for exomes_list
+mkdir -p exomes_list
+
+#Replacing spaced wordss with underscore to help with alignment of data
+sed 's/Not sequenced/Not_sequenced/;s/New Jersey/New_Jersey/;s/Staten Island/Staten_Island/;s/Diamater (mm)/Diameter_(mm)/g' clinical_data.txt > exomes_list/data.txt
+
+#aligned data
+grep -v "^#" exomes_list/data.txt | cut -f 1-8 | column -t > exomes_list/data_set.txt
+
+# cutting data to align with 20-30 mm and sequenced samples
+awk '{if ($5 ~ /Sequenced/ && $3>=20 && $3<=30)print $0 }' exomes_list/data_set.txt > exomes_list/exomes_list.txt
+
+# Printing statements of script results
+echo 'Provided below are the information of exomes :'
+cat exomes_list/exomes_list.txt
+
+while read line; 
+do
+	cp  week4_copy_files/exomes/$line.fasta exomes
+
+#printing statement to show script is complete
+echo "Analysis complete. Please move to exomes_list directory to review files."
+
+
+
+#
+mkdir -p top_exomes_list
+mkdir -p top_exomes_list/exomes_list
+#
+filename='motif_list.txt'
+FILES=exomes/*.fasta
+for f in $FILES; do
+animal=$(echo "$f" | sed -r "s/.+\/(.+)\..+/\1/")
+echo "Examing this Animal: $animal"
+#
+        while read line; do
+                count=$(fgrep -o $line $f | wc -l)
+                echo "$line $count" >> top_exomes_list/exomes_list/${animal}_motifs.txt
+                sort -nr -k 2 top_exomes_list/exomes_list/${animal}_motifs.txt | head -n 3 > top_exomes_list/${animal}_topmotifs.fasta
+
+        done <$filename
+done
+~
+
+#!/bin/bash
+
+#creating directories to place animal exome files accordingly
+mkdir -p top_exomes
+mkdir -p top_exomes/sorted_exomes
+mkdir -p top_exomes/exomes_list
+mkdir -p top_exomes/sequenced_exomes
+#variables from files used to create animal variable
+filename='motif_list.txt'
+FILES=exomes/*.fasta
+for f in $FILES; do
+animal=$(echo "$f" | sed -r "s/.+\/(.+)\..+/\1/")
+echo "Examing this Animal: $animal"
+#finding the most occurances of sequences per animal
+        while read line; do
+                count=$(fgrep -o $line $f | wc -l)
+                echo "$line $count" >> top_exomes/exomes_list/${animal}_motifs.txt
+
+                        sort -nr -k 2 top_exomes/exomes_list/${animal}_motifs.txt | head -n 3 > top_exomes/sorted_exomes/${animal}_topmotifs.txt
+
+                        awk '{print $1}' top_exomes/sorted_exomes/${animal}_topmotifs.txt > top_exomes/sequenced_exomes/${animal}_sequence.txt
+
+
+        done <$filename
+#sequences pulled from sequence files to set variables
+seq=CTTCAAAATTTT
+seq1=TACACTTCTACA
+seq2=TTTTTACACTTC
+
+while read line;
+do
+ grep -B l $line exomes${animal}.fasta 
+ 
+ done <${animal}_sequenced.txt
+
+#Using sequences provided, grabbing all the genes associated with each sequence with animal file
+grep -B 1 $seq exomes/${animal}.fasta | grep -B 1 $seq1 exomes/${animal}.fasta | grep -B 1 $seq2 exomes/${animal}.fasta | grep -v -- "^--$" exomes/${animal}.fasta > top_exomes/${animal}_topmotifs.fasta
+
+done
+#completing script with echo statement
+echo "Analysis Complete. Please move to top_exomes directory to review files."
+
+#
+mkdir -p precrispr
+#
+FILES=exomes/*.fasta
+for f in $FILES; do
+#
+animal=$(echo "$f" | sed -r "s/.+\/(.+)\..+/\1/")
+#
+echo "Precrispr ${animal} sequence starting"
+#
+motifs=top_exomes/${animal}_topmotifs.fasta
+
+        while read line; do
+                grep -E -B 1 '.{20}[ATCG]GG' -E --no-group-separator $motifs   > precrispr/${animal}_precrispr.fasta
+
+
+        done <$motifs
+#
+echo "Precrispr for ${animal} : complete"
+
+done
+
+echo "Analysis complete"
+~
+#!/bin/bash
+
+#
+mkdir -p postcrispr
+
+#
+FILES=exomes/*.fasta
+for f in $FILES; do
+
+animal=$(echo "$f" | sed -r "s/.+\/(.+)\..+/\1/")
+
+#
+echo "Beginning postcrispr $animal sequence "
+precrispr=precrispr/${animal}_precrispr.fasta
+
+#
+        while read line; do
+
+                sed 's/[ATGC]GG/A&/' ${precrispr} > postcrispr/${animal}_postcrispr.fasta
+
+        done < $precrispr
+
+#
+echo "Postcrispr ${animal} sequence complete"
+
+done
+
+echo "Analysis complete"
+
+import csv
+
+adict ={}
+with open('clinical_data.txt', 'r') as f:
+    reader = csv.reader(f, delimiter='\t')
+    next(reader)
+    for row in reader:
+        #print row
+        location = row[1]
+        diameter = row[4]
+        if location in adict:
+            if status == 'Sequenced':
+                adict[location][0] += 1
+            elif status == 'Not sequenced':
+                adict[location][1] += 1
+        else:
+            adict[location]=[0,0]
+            if status == 'Sequenced':
+                adict[location][0] = 1
+            elif status == 'Not sequenced':
+                adict[location][1] = 1
+
+for key in adict:
+    print key, adict[key]
+    print("in location %s, there were %d sequenced cases. And there were %d not sequenced cases" %(key,adict[key][0], adict[key][1]))
+	
+	 Discoverer=row[0]
+        Location=row[1]
+        Diameter=row[2]
+        Environment=row[3]
+        Status=row[4]
+        Codename=row[5]
+
+import csv
+
+adict ={}
+with open('clinical_data.txt', 'r') as f:
+    reader = csv.reader(f, delimiter='\t')
+    next(reader)
+    for row in reader:
+        #print row
+        location = row[1]
+        diameter = row[4]
+        if location in adict:
+            if status == set(range(20,30)):
+                adict[location][0] += 1
+            elif status == 'Not sequenced':
+                adict[location][1] += 1
+        else:
+            adict[location]=[0,0]
+            if status == 'Sequenced':
+                adict[location][0] = 1
+            elif status == 'Not sequenced':
+                adict[location][1] = 1
+				
+				len(same)
+				
+import csv
+
+adict={}
+with open('clinical_data.txt', 'r') as f:
+    reader = csv.reader(f, delimiter='\t')
+    next(reader)
+    #for f in filelist:
+    for row in reader:
+        #print row
+        Discoverer=row[0]
+        Location=row[1]
+        Diameter=row[2]
+        Environment=row[3]
+        Status=row[4]
+        Codename=row[5]
+        Diameter_num = float(Diameter)
+        if Diameter_num <= 30 and Diameter_num >=20 and Status == 'Sequenced':
+           print ("The organism %s discovered by %s, has a diameter of %s, in the %s enviroment and has  of genes in common with the cohert and the folowing unique to only itself: " % (Codename, Discoverer, Diameter, Environment))
+    #else:
+     #   adict[Location]=[0,0]
+      #  if status == 'Sequenced':
+       #   adict[Location][0] = 1
+      # elif status == 'Not sequenced':
+       #     adict[Location][1] = 1
+
+
+import glob
+import re
+
+#pattern = "gene"
+#print(glob.glob( "postcrispr/*.fasta"))
+filelist= glob.glob( "postcrispr/*.fasta")
+
+#agene{}
+gene= open('postcrispr/chicken_postcrispr.fasta', 'r')
+gene1= open('postcrispr/fox_postcrispr.fasta', 'r')
+
+with open('postcrispr/chicken_postcrispr.fasta') as gene:
+    with open('postcrispr/fox_postcrispr.fasta') as gene1:
+        same = set(gene).intersection(gene1)
+		if gene in agene:
+            if status:
+                adict[location][0] += 1
+            elif status == 'Not sequenced':
+                adict[location][1] += 1
+        else:
+            adict[location]=[0,0]
+            if status == 'Sequenced':
+                adict[location][0] = 1
+            elif status == 'Not sequenced':
+                adict[location][1] = 1
+	print (same)
+
+#print("Common Lines in Both Files")
+ #reader = open
+  #  if gene in gene:
+   #     if gene == 'gene'
+    #for line in file:
+
+
+#With open(filelist[0], 'r') as f:
+
+
+     #   for f in filelist:
+ #           print ("The organism %s discovered by %s, has a dimater of %s, in the %s enviroment and has  of genes in common with the cohert and the folowing unique to only itself: %")(adict, adict[Codename][0],adict[Discoverer[0],adict[Environment[0],)
+
+
+genedict = {}
+filelist = glob.glob('exomes/*')
+for fasta in filelist:
+    # print fasta.split('/')[1].split('.')[0]
+    base=os.path.basename(fasta)
+    basename = os.path.splitext(base)[0]
+
+    #read in fasta file, and only grab headers. So the resulting variable will look something like this: ['gene1','gene100','gene320']
+    genelist = ['gene*']
+    genedict[basename] = genelist
+    print genedict[basename]
+
+
+for g in genedict:
+    print g
+    print genedict[g]
+    seta = set(genedict[g])
+
+    for nextanimal in genedict:
+        if nextanimal != g:
+            seta = seta - set(genedict[nextanimal])
+print seta
+
+
+    # print basename
+    # print adict[basename]
+    # print ("The organism %s discovered by %s, has a diameter of %s, in the %s enviroment and has  of genes in common with the cohert and the folowing unique to only itself: " % (basename, adict[basename][0], adict[basename][1], adict[basename][2]))

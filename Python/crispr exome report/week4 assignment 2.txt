@@ -1,0 +1,182 @@
+copyExomes.sh
+#!/bin/bash
+
+#creating directory to store files for exomes_list
+mkdir -p exomes_list
+mkdir -p exomes
+
+#Replacing spaced wordss with underscore to help with alignment of data
+sed 's/Not sequenced/Not_sequenced/;s/New Jersey/New_Jersey/;s/Staten Island/Staten_Island/;s/Diamater (mm)/Diameter_(mm)/g' clinical_data.txt > exomes_list/data.txt 
+
+#aligned data 
+grep -v "^#" exomes_list/data.txt | cut -f 1-8 | column -t > exomes_list/data_set.txt
+
+# cutting data to align with 20-30 mm and sequenced samples
+awk '{if ($5 ~ /Sequenced/ && $3>=20 && $3<=30)print $0 }' exomes_list/data_set.txt > exomes_list/exomes_list.txt
+
+#created txt file to just have only codename 
+awk '{print $6}' exomes_list/exomes_list.txt > exomes_list/exome_codename.txt
+
+#loop top copy each exome from week4_copy_files
+while read line; do
+cp  week4_copy_files/exomes/$line.fasta exomes
+done < exomes_list/exome_codename.txt
+
+# Printing statements of script results
+echo 'Provided below are the information of exomes :' 
+cat exomes_list/exomes_list.txt
+
+#printing statement to show script is complete
+echo "Analysis complete. Corresponding exomes within conditions have been navigated to the exome directory. Please review files within exomes_list directory for further analysis. "
+
+createCrisprReady.sh
+#!/bin/bash
+
+#creating directories to place animal exome files accordingly
+mkdir -p top_exomes
+mkdir -p top_exomes/sorted_exomes
+mkdir -p top_exomes/exomes_list
+mkdir -p top_exomes/sequenced_exomes
+#variables from files used to create animal variable
+filename='motif_list.txt'
+FILES=exomes/*.fasta 
+for f in $FILES; do   
+animal=$(echo "$f" | sed -r "s/.+\/(.+)\..+/\1/") 
+echo "Examing this Animal: $animal"
+#finding the most occurances of sequences per animal
+	while read line; do 
+		count=$(fgrep -o $line $f | wc -l)
+		echo "$line $count" >> top_exomes/exomes_list/${animal}_motifs.txt	
+		
+			sort -nr -k 2 top_exomes/exomes_list/${animal}_motifs.txt | head -n 3 > top_exomes/sorted_exomes/${animal}_topmotifs.txt		
+		
+			awk '{print $1}' top_exomes/sorted_exomes/${animal}_topmotifs.txt > top_exomes/sequenced_exomes/${animal}_sequence.txt
+					
+	done <$filename
+
+#Using sequences provided, grabbing all the genes associated with each sequence with animal file
+	while read line; do
+	grep -B 1 $line exomes/${animal}.fasta | grep -B 1 $line exomes/${animal}.fasta | grep -B 1 $line exomes/${animal}.fasta | grep -v -- "^--$" exomes/${animal}.fasta > top_exomes/${animal}_topmotifs.fasta
+	done < top_exomes/sequenced_exomes/${animal}_sequence.txt
+done
+
+#completing script with echo statement
+echo "Analysis Complete. Please navigate to the top_exomes directory to review files."
+
+editGenome.sh
+#!/bin/bash
+
+#creating directory to store .fasta files
+mkdir -p postcrispr 
+
+#varables created for loop
+FILES=exomes/*.fasta 
+for f in $FILES; do 
+animal=$(echo "$f" | sed -r "s/.+\/(.+)\..+/\1/") 
+
+#print statement to initiate loop
+echo "Beginning postcrispr $animal sequence "
+precrispr=precrispr/${animal}_precrispr.fasta	
+
+#loop created to add A in every (any base pair)GG sequence
+	while read line; do
+		
+		sed 's/[ATGC]GG/A&/' ${precrispr} > postcrispr/${animal}_postcrispr.fasta
+
+	done < $precrispr
+
+#indicating postcrispr for animal sequence is complete
+echo "Postcrispr ${animal} sequence complete"
+
+done
+#completion of script
+echo "Analysis complete. Please navigate to postcrispr directory to review files."
+
+identifyCrisprSite.sh
+#!/bin/bash
+
+#creating directory to store .fasta files
+mkdir -p precrispr
+#variables created to set up loop
+FILES=exomes/*.fasta 
+for f in $FILES; do 
+animal=$(echo "$f" | sed -r "s/.+\/(.+)\..+/\1/") 
+#Producing echo to begin loop
+echo "Precrispr ${animal} sequence starting"
+#Loop created to create .fasta file per requirements
+motifs=top_exomes/${animal}_topmotifs.fasta
+	
+	while read line; do
+		grep -E -B 1 '.{20}[ATCG]GG' -E --no-group-separator $motifs   > precrispr/${animal}_precrispr.fasta
+
+
+	done <$motifs 
+#completion of animal loop
+echo "Precrispr for ${animal} : complete"
+
+done
+#Completion of script
+echo "Analysis complete.Please move to precrispr directory to review files."
+
+exomeReport.py
+import csv 
+import os, glob
+
+genedict = {}
+#creating set to each exome file
+def get_nucl(filename):     
+    with open(filename,'r') as fd:
+        agenes = set()
+        for line in fd:
+            if line[0]=='>':
+                agenes.add(line.strip()[1:]) 
+    return agenes
+
+#pulling each postcrispr file to compare each file could not figure out how to obtain common coherts in print statement
+filelist = glob.glob('postcrispr/*') 
+for fasta in filelist:
+    base=os.path.basename(fasta)
+    basename = os.path.splitext(base)[0]
+
+    agene = get_nucl('postcrispr/' + base)
+    genedict[basename] = agene
+
+#creating dictionary set to subtract the dictionary to find unique genes
+uniqgene={}
+for g in genedict:
+    ugene = set(genedict[g])
+    
+    for animal in genedict:
+      if animal != g: 
+           ugene = ugene - set(genedict[animal])
+    uniqgene[g]=ugene   
+
+#created dictionary to call each category required. Print statements are generated to print out codename, discoverer,diameter.environment, unique genes, and common cohert number  
+adict={}
+with open('clinical_data.txt', 'r') as f:
+    reader = csv.reader(f, delimiter='\t') 
+    next(reader)
+    for row in reader:
+        Discoverer=row[0]
+        Location=row[1]
+        Diameter=row[2]
+        Environment=row[3]
+        Status=row[4]
+        Codename=row[5]
+        Diameter_num = float(Diameter)
+        if Diameter_num <= 30 and Diameter_num >=20 and Status == 'Sequenced':
+            print ("Results have shown that organism %s was discovered by %s, has a diameter of %s, and in the %s enviroment." % (Codename, Discoverer, Diameter, Environment ))
+            for animal in uniqgene:
+                animalname = animal[0:-11]
+                if (animalname==Codename):
+                    dgene = str(list(uniqgene[animal]))[1:-1]
+                    cgene = str(len(uniqgene[animal]))
+                    print "The following genes are unique :",dgene
+                    print "there are %s unique genes" % (cgene)
+                else:
+                    dgene = 'no genes'
+                    cgene = 'no unique genes'
+
+print "Project complete"
+
+

@@ -1,0 +1,21 @@
+#!/bin/bash
+filename='interesting_motifs.txt'
+
+#Loop, print and transfer motif counts to .txt file
+touch motif_count.txt
+while read line; do
+echo "$line occurrences : $(grep -c $line r_bifella.fasta)" >> motif_count.txt
+echo "$line occurrences : $(grep -c $line r_bifella.fasta)"
+done < $filename
+
+#Create corresponding sequences of genes to .fasta file
+touch $line.fasta
+while read line; do
+grep -ie $line -ie gene r_bifella.fasta >> $line.fasta
+done < $filename
+
+#Create and move .fasta files to folder
+mkdir -p 'motifs'
+while read line; do
+mv $line.fasta motifs
+done <$filename 

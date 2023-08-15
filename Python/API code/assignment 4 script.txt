@@ -1,0 +1,149 @@
+import requests, sys, re
+from Bio import SeqIO
+
+#created variables to call APIs for information
+gene='MC1R'
+server = "http://rest.ensembl.org"
+servermy = "http://mygene.info/v3/query?q=symbol:%s&species=human" %(gene)
+
+# print statements are in place for each step to indicated to programmer which step python is on
+# some print statements are commented out due to sanity checks
+print('Looking for %s ensembl ID' %(gene))
+
+# API request from mygene server which would acquire the Id 4157 for MC1R
+r = requests.get(servermy)
+ 
+if not r.ok:
+  r.raise_for_status()
+  sys.exit()
+ 
+decoded = r.json()
+# printed and evaluate code
+# print(repr(decoded))
+# print(decoded)
+
+# decoded was in a dictionary,  applied all indexes to narrow down ID 
+# print(decoded['hits'][0]['entrezgene'])
+g1=decoded['hits'][0]['entrezgene']
+# print(g1)
+
+# API request from mygene server which would acquire the ensembl ID
+server1 = "http://mygene.info/v3/gene/%s"%(g1)
+r1 = requests.get(server1)
+ 
+if not r1.ok:
+  r1.raise_for_status()
+  sys.exit()
+ 
+decoded1 = r1.json()
+# printed to evaluate code
+# print(repr(decoded1))
+# print(decoded1)
+
+# decoded1 was in a dictionary,  applied all indexes to narrow down ensembl ID 
+# print(decoded1['ensembl']['gene'])
+enid=decoded1['ensembl']['gene']
+# discovered ensembl id="ENSG00000258839" after print
+# print(enid)
+
+# created more varibles using the ensembl id that was discovered to find the sequence and homologous species of gene
+ext1 = "/sequence/id/%s?type=genomic" %(enid)
+ext2 = "/homology/id/%s?format=condensed;type=orthologues"%(enid)
+r2 = requests.get(server+ext1, headers={ "Content-Type" : "text/x-fasta"})
+r3 = requests.get(server+ext2, headers={ "Content-Type" : "text/xml"})
+print('%s ensembl ID is %s' %(gene,enid))
+
+# acquring sequence from ensembl database with set variables above
+print("Acquiring %s sequence using %s" %(gene,enid))
+if not r2.ok:
+  r2.raise_for_status()
+  sys.exit()
+
+print('Sequence is listed below:\n')
+print(r2.text)
+# creating fasta file using MC1R as fasta file name
+print("Creating and appending data to fasta file")
+# created 2 fasta files to ensure no issues while running the script with appended DNA and Amino Acid sequence to original fasta
+f=open('%s.fasta'%(gene),"w")
+f1=open('%s_sequence.fasta'%(gene),"w")
+f.write(r2.text)
+f1.write(r2.text)
+print('Fasta file complete')
+
+#setting variables for each fasta file
+seq=('%s_sequence.fasta'%(gene))
+mfile=('%s.fasta'%(gene))
+#Longest ORF for DNA sequencing from fasta file
+print("Finding longest ORF DNA sequence")
+print("ORF DNA sequence listed below: \n")
+# created loop to find ORF of DNA sequence using biopython seq
+records = SeqIO.parse(seq, 'fasta') 
+for record in records:
+    for strand, seq in (1, record.seq), (-1, record.seq.reverse_complement()):
+        for frame in range(3):
+            index = frame
+            while index < len(record) - 6:
+                # regex to find start condon and stop codon
+                match = re.match('(ATG(?:\S{3})*?T(?:AG|AA|GA))', str(seq[index:]))
+                if match:
+                    # orf varibale stored the matched seqeunces within the fasta file
+                    orf = match.group()
+                    # using len to find longest ORF
+                    index += len(orf)
+                    # restriction of longest ORF being greater than 1300. This number can be adjusted to find ORFS whatever number you may be looking for.
+                    if len(orf) > 1300:
+                        pos = str(record.seq).find(orf) + 1 
+                        # printing ORF DNA sequencing along with headers
+                        print("\n>{}'s Longest ORF DNA sequence: {}...{} - length(nucleotide): {}, strand: {}, frame: {}, pos: {}\nHere is the full DNA sequence length:\n{}\n".format\
+                        (record.id,orf[:6], orf[-3:], len(orf), strand, frame, pos, orf ))
+                        #opening and appending fasta file with DNA sequence
+                        f=open(mfile,"a"  )
+                        f.write("\n>{}'s Longest ORF DNA sequence: {}...{} - length(nucleotide): {}, strand: {}, frame: {}, pos: {}\n{}\n".format\
+                        (record.id,orf[:6], orf[-3:], len(orf), strand, frame, pos, orf ))
+                        # print(orf)
+                else: index += 3
+
+#converting DNA sequence to amino acid
+print('Converting DNA sequence to amino acid sequence')
+# recreating varibales to ensure script runs correctly
+seq=('%s_sequence.fasta'%(gene))
+# created loop to locate ORF amino acid sequence using biopython. 
+records = SeqIO.parse(seq, 'fasta') 
+for record in records:
+    for strand, seq in (1, record.seq), (-1, record.seq.reverse_complement()):
+        for frame in range(3):
+            length = 3 * ((len(seq)-frame) // 3)
+            # amino acid codon chart was added to convert ORF DNA sequence to Amino Acid sequence within loop
+            for pro in seq[frame:frame+length].translate(table = 1).split("*")[:-1]:
+                if 'M' in pro:
+                     # seqeuence was found and appended in orf varaible
+                    orf = pro[pro.find('M'):]
+                    pos = seq[frame:frame+length].translate(table=1).find(orf)*3 + frame +1
+                    if len(orf)*3 +3 > 1300:
+                        # printing longest ORF amino acid sequence along with headers
+                        print(">{}'s Longest ORF Amino Acid: {}...{} - length(nucleotide): {}, length(amino acid): {}, strand: {}, frame: {}, pos: {}\nHere is the full amino acid length:\n{}\n".format\
+                           (record.id, orf[:3], orf[-3:], len(orf)*3+3, ((len(orf)*3+3)/3), strand, frame, pos, orf))
+                        # print (orf)
+                        # appending Amino acid sequence into MC1R fasta file
+                        f=open(mfile,"a"  )
+                        f.write(("\n>{} Longest ORF Amino Acid: {}...{} - length(nucleotide): {}, length(amino acid): {}, strand: {}, frame :{}, pos: {}\n{}\n".format\
+                           (record.id, orf[:3], orf[-3:], len(orf)*3+3, ((len(orf)*3+3)/3), strand, frame, pos, orf)))
+print('Located ORF DNA sequence')
+
+# creating homologous MC1R list pulled from ensembl database
+print("Creating homologous %s unique species list"%(gene))
+if not r3.ok:
+  r3.raise_for_status()
+  sys.exit()
+# used regex find all to isolate the species 
+species = re.findall('species="([^"]*)"',(r3.text))
+# created txt file to append species to file
+h=open('%s_homology_list.txt'%(gene),"a"  )
+print ('Below are the unique homologous species:')
+# created loop to append all species into txt file
+h.write('Below are the unique homologous species:\n')
+for animal in species:
+    print(animal)
+    h.write(('%s \n' %(animal)))
+#printing statement to inform script is complete
+print('Discovery of %s, ORF Amino acid sequnce and Homologous unique species list are complete'%(gene))
