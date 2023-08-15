@@ -1,0 +1,352 @@
+---
+title: "Week 8 homework assignment"
+author: "Christopher Tran"
+date: "3/1/2022"
+output: html_document
+---
+
+1. (30 points) In the Notes we have retrieved from HRPD data table all direct protein-protein interactions among the top deferentially expressed genes (we considered differential expression wrt the outcome of interest, i.e.
+recurrent/non-recurrent disease). It would be clearly interesting to find out if the interactions are “significant”, in a sense that there are more interactions among our genes than it would be expected by chance. If the interactions are indeed significant, one could argue that this suggests some additional degree of consistency in the results: it is plausible that closely related genes – those that participate in the same pathways or even directly interact – would tend to
+exhibit differential expression simultaneously. Thus, statistically significant interaction count would lend further (even if only circumstantial) support to the list of genes obtained from the differential expression experiment.
+
+(a) Repeat the following procedure large number of times (e.g. ~1000): draw a random sample of genes, find direct interactions among them using the HPRD table, record separately the number of loops (self-interactions) and of interactions between pairs of distinct proteins.
+
+(b) Plot the histograms of the distributions of these two counts and evaluate the significance of the counts found for the list of top genes (as in the Notes) against those background distributions. Comment on the results.
+NOTE: you have to think carefully about what the most appropriate background distribution should be. What is the correct size of the sample? What is the correct “universe” of the genes to draw the random samples from? There is not necessarily the single “correct” answer, but at least some are better than some others, and at the very least you have to (briefly) discuss and explain your choice.
+
+```{r, error=TRUE}
+# calling library and variables
+library(org.Hs.eg.db)
+library(graph)
+library(gplots)
+library(breastCancerNKI)
+library(reactome.db)
+library(graph)
+
+data(nki)
+ge=exprs(nki)
+t.m = pData(nki)$t.rfs 
+e.m = pData(nki)$e.rfs
+T.cut = 3000
+
+sample.sel = ! is.na(t.m) & ( t.m >= T.cut | t.m < T.cut & e.m == 1 )
+
+ge = ge[,sample.sel]
+e.m = e.m[sample.sel]
+
+e.m=factor(e.m,levels=c(0,1))
+# creating DE.data
+DE.data = as.data.frame(
+ t(
+ apply(ge,1,function(x) {
+ tt = t.test(x~e.m)
+ return( c(diff(tt$estimate),tt$p.value))
+ })
+ )
+)
+colnames(DE.data)=c("LogFC","p.value")
+DE.data$transcript = rownames(DE.data)
+
+# creating function to call ids
+tr2gs = function(ids) {
+ require(org.Hs.eg.db)
+ gene.symbols.a = mapIds(org.Hs.eg.db,keys=ids,
+ keytype = "ACCNUM",column="SYMBOL",multiVals = "first")
+ gene.symbols.f = fData(nki)[ids,"HUGO.gene.symbol"]
+ gene.symbols = ifelse(
+ ! is.na(gene.symbols.a), gene.symbols.a, 
+
+ ifelse( ! is.na(gene.symbols.f), as.character(gene.symbols.f),ids)
+ )
+ return(gene.symbols)
+}
+
+# transferomg id to DE.data
+DE.data$Symbol = tr2gs(DE.data$transcript)
+
+# cor distance and var calc
+corr.dist=function(x) { as.dist(1-cor(t(x),use="pairwise")) }
+redgreen <- function(n) {
+ c(hsv(h=2/6, v=seq(1,0,length=n/2) ), hsv(h=0/6, v=seq(0,1,length=n/2)) )
+}
+vars=apply(ge,1,var)
+gene.sel=order(vars,decreasing=T)[1:200]
+sample.labels = colnames(ge)
+
+
+
+# a
+# creating trial for 100
+
+gene.sel.cr=order(vars,decreasing=T)[1:300]
+ge.300 = ge[gene.sel.cr,] 
+
+c.null=numeric()
+for ( trial in 1:100) {
+ ge.test = t(apply(ge.300,1,sample))
+ corr.t = cor(t(ge.test),use="pairwise")
+ diag(corr.t) = 0 
+ c.null = c(c.null,as.numeric(corr.t)) 
+}
+
+
+ge.cor = cor(t(ge.300),use="pairwise")
+adj.mat = ifelse(ge.cor > 0.6,1,0) 
+diag(adj.mat) = 0 
+connected = apply(adj.mat,1,sum) > 0 
+adj.mat = adj.mat[ connected, connected ] 
+G.corr = graphAM(adj.mat) 
+
+er.status = as.factor(pData(nki)$er[sample.sel])
+DE.data$er.p.value = apply(ge,1,function(x) {
+ tt = t.test(x~er.status)$p.value
+})
+
+
+kgxref=read.table("kgXref.txt",sep="\t",as.is=T,comment="",header=T,quote="")
+hprd = read.table("humanHprdP2P.txt.gz",as.is=T,header=T,comment="")
+
+hprd.gs=merge(hprd,kgxref,by.x="X.query",by.y="X.kgID")[,c(1:3,7)]
+colnames(hprd.gs)=c("query","target","distance","q.symbol")
+hprd.gs=merge(hprd.gs,kgxref,by.x="target",by.y="X.kgID")[,c(1:4,8)]
+colnames(hprd.gs)=c("target","query","distance","q.symbol","t.symbol")
+
+hprd.gs.1 = hprd.gs[hprd.gs$distance==1,c("q.symbol","t.symbol")]
+
+hprd.gs.1 = as.data.frame(
+ t( apply(hprd.gs.1,1,sort) ), stringsAsFactors=F
+)
+hprd.gs.1=unique(hprd.gs.1) 
+colnames(hprd.gs.1)=c("from","to")
+
+
+top.de.genes = unique(DE.data$Symbol[order(DE.data$p.value)[1:100]])
+subnet = hprd.gs.1[hprd.gs.1$from %in% top.de.genes &
+ hprd.gs.1$to %in% top.de.genes,]
+subnet$weight=1 
+G.de = graphBAM(subnet)
+
+
+# creating trial for 1000
+c.null2=numeric()
+for ( trial in 1:1000) {
+ ge.test2 = t(apply(ge.300,1,sample))
+ corr.t2 = cor(t(ge.test),use="pairwise")
+ diag(corr.t2) = 0 
+ c.null2 = c(c.null2,as.numeric(corr.t2)) 
+}
+
+
+top.de.genes2 = unique(DE.data$Symbol[order(DE.data$p.value)[1:100]])
+subnet2 = hprd.gs.1[hprd.gs.1$from %in% top.de.genes2 &
+ hprd.gs.1$to %in% top.de.genes2,]
+subnet2$weight=1 
+G.de2 = graphBAM(subnet2)
+
+
+# b
+# graph histogram
+hist(c.null,breaks=30,col="lightgreen",cex.axis=1.6)
+hist(c.null2,breaks=30,col="lightgreen",cex.axis=1.6)
+
+plot(G.de, attrs=list(node=list(fontsize=60)))
+plot(G.de2, attrs=list(node=list(fontsize=60)))
+
+```
+
+Looking at the results of both histograms and comparing there does not seem to be much of a difference in terms of something being noticable. In terms of depth, even when running through deeply there doesn't seem to be much of a connection as well.
+
+2. (70 points) In the Notes we have considered an alternative representation of clusters formed by genes with correlated expression profiles: correlation networks. Let us dig a little deeper into the clusters found by looking for significantly overrepresented annotations (you can certainly apply the same approach to any gene list: a cluster of genes from a more “traditional” clustering procedure such as hierarchical clustering, or to a set of genes forming a tightly connected community in a protein-protein interaction network).
+
+a. First, it is certainly convenient to identify those clusters computationally rather than manually selecting genes based on the plot of the graph! The function connComp() from the package graph will do just what we need: identify maximal connected components in the graph (i.e. subgraphs such that there is a path from any node to any other node within each subgraph, but there are no connections between the subgraphs). The output of this function is a list, with each element of the list being a vector of node IDs falling into a single connected component. The G.corr correlation network graph we built in the Notes uses adjacency matrix representation (it has class “graphAM”),
+and for the life of me I cannot understand why an overloaded version of the function connComp() is not provided which would work directly with graphs in this representation (if you try calling it on G.corr, the error will be reported). But we can convert G.corr to the node-edge list representation and this will solve the problem. Use G.corr = as(G.corr,"graphNEL") to change the graph representation, then use connComp() to get the connected components.
+
+b. We are going to be using the Reactome pathway database for annotations. Download package reactome.db from Bioconductor and examine it (at least try columns(reactome.db)). This is just another annotation package (same interface as that of org.Hs.eg we have been looking at in the Notes). This database annotates each gene with biological pathway(s) it participates in. The genes are specified by their Entrez ID (column ENTREZID). The IDs of the nodes in our G.corr graph, however are array probe IDs/accession numbers (a mix of RefSeq and GeneBank). Use org.Hs.eg, array annotations (fData()), and your best judgement to convert the IDs of the nodes in the connected components you obtained in the previous step to Entrez IDs (some probes will not have Entrez ID available, just replace those with NA).
+
+c. For each connected component, retrieve all the pathway annotations and obtain the count table (use select() to retrieve all the pathway names for all the genes in the component, then use table() to compute how many times each pathway name appears (i.e. how many genes were actually annotated with that pathway). It is convenient to build a list of such count tables: each element storing the pathway annotation count tables for the corresponding connected component (use loop or lappy(), whichever seems more natural to you).
+
+d. For each pathway count table obtained in the previous step (i.e. for each connected component separately), take all the pathway annotations for that component (they are just the names of the table object you already computed) and retrieve the total counts of genes annotated with those pathways from reactome.db. You can again use select(), just choose key=, keytype= and column= appropriately in order to get all EntrezIDs for each of the pathway names specified. It seems to be more fair to count not all known human genes, but only genes represented on the array. So you will also have to convert all accession numbers of the array probes to Entrez IDs and for each pathway name and all the genes (entrez IDs) in that pathway you will have to count only those genes that are actually present on the array. If this sounds too difficult, you may instead just retrieve counts of genes (still only those present on the array) for each and every pathway name in the database (see keys()).
+
+e. We are now set up for a simple Fisher test for overrepresentation. Our problem looks as follows: we have the array - “universe” (or a “bag”) of genes (or let’s say marbles). The total number of genes (marbles) is N. Some number of those genes, total.cnt, have annotation X (or, say, total.cnt marbles are red) – this is what we have computed in part (d) above. We take a sample of size n.selected from the bag and we observe that in our sample n.overlap genes have annotation X (or n.overlap marbles in the drawn sample are red). In order to calculate whether the number of genes with annotation X in our samples more or less what would be expected by random chance or whether
+the annotation is in fact more overrepresented (i.e. we have drawn significantly more red marbles than expected!), we have to construct a contingency table and apply Fisher test to it: X Not X Drawn n.overlap n.selected-n.overlap Left in the bag total.cnt-n.overlap N – n.selected - total.cnt + n.overlap You can easily check that the marginal counts (sums across rows or columns) give the correct values for the total numbers ox X, not X, drawn, or left behind. Here is a function that will take the counts as specified above and return the Fisher’s test p-value (looking for overrepresentation only, underrepresentation will not show up as significant due to the alternative we are considering): 
+test.enrichment = function(N,total.cnt,n.selected,n.overlap) {
+fisher.test(matrix(c(n.overlap,total.cnt-n.overlap,
+ n.selected-n.overlap,
+N-n.selected-total.cnt+n.overlap),
+ ncol=2),alternative=”greater”)$p.value
+}
+
+In our case N = total number of genes (not probes!) on the array. Foreach connected component (the selection that we made,n.selected) we have different pathways genes in this component are annotated with. For each pathway, we have the count of genes in the component that participate in it, n.overlap (part (c) above) and the total count of genes on the array that participate in that pathways, total.cnt (from part (d) above). You can now apply the function shown above and calculate enrichment p-value for the specific pathway in the given component. Your result should be a list, one element per connected component. Each elements should contain a table for the corresponding connected component: a data frame which lists all the pathways in that component, count of genes in the component that are also in the pathway, total count of genes on the array that are in the pathway, and the enrichment p-value. It should look similar to this: PATHWAY N.COMP N.ARRAY P.VALUE Pathway X 2 6 0.000131 Pathway Y 4 871 0.264782
+
+```{r, error=TRUE}
+# calling and setting variables
+library(org.Hs.eg.db)
+library(graph)
+library(gplots)
+library(breastCancerNKI)
+library(reactome.db)
+library(graph)
+library(dplyr)
+
+data(nki)
+ge=exprs(nki) 
+t.m = pData(nki)$t.rfs 
+e.m = pData(nki)$e.rfs
+T.cut = 3000 
+
+sample.sel = ! is.na(t.m) & ( t.m >= T.cut | t.m < T.cut & e.m == 1 )
+
+ge = ge[,sample.sel]
+e.m = e.m[sample.sel]
+
+
+e.m=factor(e.m,levels=c(0,1)) 
+# creating De data
+DE.data = as.data.frame(
+ t(
+ apply(ge,1,function(x) {
+ tt = t.test(x~e.m)
+ return( c(diff(tt$estimate),tt$p.value))
+ })
+ )
+)
+
+colnames(DE.data)=c("LogFC","p.value")
+DE.data$transcript = rownames(DE.data)
+
+# function for id
+tr2gs = function(ids) {
+ require(org.Hs.eg.db)
+ # map probe Ids using human annotation table. Note that we use mapIds() instead of
+ # select() here. It is literally the same (and takes the same parameters), except that
+ # (1) it returns just the specified single column, as a vector (select() returns a
+ # table, and we need to manually select the column(s) we want); and (2) when a single
+ # key maps onto multiple values, with mapId we can resolve this by e.g. asking to 
+ # choose just the first mapping available (as we do below) – not ideal, but there 
+ # are only a few such cases in the data and it is more important for us now to make
+ # sure we map 1 to 1, and if 5 or 6 mappings are ambiguous, we can live with that. 
+ # Note that array probe IDs are a mix of RefSeq IDs (NM_XXXXXX), GenBank Ids, and 
+ # microarray’s own probe sequences (ContigXXXXX). Fortunately, the ACCNUM column of
+ # the human annotation database contains BOTH RefSeq and GenBank IDs so we do not 
+ # need to go through the hassle of mapping those separately:
+ gene.symbols.a = mapIds(org.Hs.eg.db,keys=ids,
+ keytype = "ACCNUM",column="SYMBOL",
+multiVals = "first")
+ # also retrieve gene symbols for each probe from the array annotation data:
+ gene.symbols.f = fData(nki)[ids,"HUGO.gene.symbol"]
+ # the commented code below is something you could (and should have!) run in order 
+ # to make sure the annotations are consistent, i.e. when we can get gene symbol 
+ # from both annotations, it is indeed the same. 
+ #have.both = ! is.na(gene.symbols.a) & ! is.na(gene.symbols.f)
+ #which(gene.symbols.a[have.both] != gene.symbols.f[have.both])
+ # In fact, there is a very small number
+ # of discrepancies in the data – if you inspect those, you will find out that they 
+ # are indeed historical ambiguities: genes that were not resolved as two separate 
+ # entities in the past, genes with names that were also used as alternative names 
+ # for a different gene etc. Since most mappings are consistent, and those few
+ # that are not represent the cases of poor annotation as described above, we will be
+ # always using modern annotation (from R package) when both mappings are available. 
+ gene.symbols = ifelse(
+ ! is.na(gene.symbols.a), gene.symbols.a, # org.Hs annotation is available - use it!
+ # otherwise, if array feature annotation is still available – us e that;
+# otherwise just kee p the original probe name, we do not know what it is:
+ ifelse( ! is.na(gene.symbols.f), as.character(gene.symbols.f),ids)
+ )
+ return(gene.symbols)
+}
+DE.data$Symbol = tr2gs(DE.data$transcript)
+
+# cor distance and var
+corr.dist=function(x) { as.dist(1-cor(t(x),use="pairwise")) }
+redgreen <- function(n) {
+ c(hsv(h=2/6, v=seq(1,0,length=n/2) ), hsv(h=0/6, v=seq(0,1,length=n/2)) )
+}
+vars=apply(ge,1,var)
+gene.sel=order(vars,decreasing=T)[1:200]
+sample.labels = colnames(ge)
+
+# gene selection
+gene.sel.cr=order(vars,decreasing=T)[1:300]
+ge.300 = ge[gene.sel.cr,] 
+
+# trial 
+c.null=numeric()
+for ( trial in 1:100) {
+ ge.test = t(apply(ge.300,1,sample))
+ corr.t = cor(t(ge.test),use="pairwise")
+ diag(corr.t) = 0 
+ c.null = c(c.null,as.numeric(corr.t)) 
+}
+
+# setting variables
+ge.cor = cor(t(ge.300),use="pairwise") 
+adj.mat = ifelse(ge.cor > 0.6,1,0) 
+diag(adj.mat) = 0 
+connected = apply(adj.mat,1,sum) > 0 
+adj.mat = adj.mat[ connected, connected ] 
+G.corr = graphAM(adj.mat) 
+
+# a
+# creating components
+Gg.corr = as(G.corr,"graphNEL") 
+components<-connComp(Gg.corr)
+
+components[1:5]
+
+# b
+# creating function and looping id in de.data
+tr2gs2 = function(ids) {
+ require(org.Hs.eg.db)
+ gene.symbols.a = mapIds(org.Hs.eg.db,keys=ids,keytype = "ACCNUM",column="ENTREZID",multiVals = "first")
+ gene.symbols.f = fData(nki)[ids,"EntrezGene.ID"]
+
+ gene.symbols = ifelse(
+ ! is.na(gene.symbols.a), gene.symbols.a,
+ ifelse( ! is.na(gene.symbols.f), as.character(gene.symbols.f),ids)
+ )
+ return(gene.symbols)
+}
+
+DE.data$ENTREZID = tr2gs2(DE.data$transcript)
+DE.data$ENTREZID[1:5]
+
+# c
+# creating table
+ezid<-lapply(components, tr2gs2)
+ezidt<-lapply(ezid,table)
+# ez.list<-select.list(ezid,components)
+
+ezid[1:5]
+ezidt[1:5]
+
+# d
+# linking with reactome.db
+t=unlist(ezid)
+recid.list<-AnnotationDbi::select(reactome.db, keys=t, columns= c("PATHNAME","REACTOMEID","GO","ENTREZID"), keytype="ENTREZID")
+rec.t<-data.frame(table(recid.list$ENTREZID))
+rec.t1<-lapply(recid.list$ENTREZID,table)
+
+recid.list$ENTREZID[1:5]
+rec.t1[1:5]
+# e
+# using enrichment function
+
+test.enrichment = function(N,total.cnt,n.selected,n.overlap) {
+fisher.test(matrix(c(n.overlap,total.cnt-n.overlap,
+n.selected-n.overlap,N-n.selected-total.cnt+n.overlap),
+ncol=2),alternative = "greater")$p.value}
+
+
+N<-length(ge)
+total.cnt=length(unlist(rec.t1))
+n.selected=length(ezidt)
+N.overlap=length(components)
+
+test.enrichment(N,total.cnt,n.selected,N.overlap)
+
+
+```
+
+
+
+

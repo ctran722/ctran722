@@ -1,0 +1,644 @@
+---
+title: "Final project"
+author: "Christopher Tran"
+date: "2/15/2022"
+output: html_document
+---
+
+The data found here https://www.ncbi.nlm.nih.gov/geo/query/acc.cgi?acc=GSE18606 
+contains micro-array serum expression profiles of male or female patients with or without kawasaki disease treated with IVIG.
+Patients were then classified based on if they responded to IVIG treatment or not.  
+The code below downloads the raw data and fold change data comparing IVIG non-responders to control or IVIG responders to controls 
+your goal in this assignment is to return a set of genes that optimally differentiates IVIG non-responders and control individuals.
+hint: For this assignment, you will need to: 
+
+a) Generate PCA plots of the raw data colored by classification
+b) Find a method of measurement that will allow you to monitor clustering efficiency of the raw data 
+c) Take serial cuts through the data and return the cut that optimizes the distance between the two classifications.
+
+
+```{r, error=TRUE}
+############################################################################################
+#### This function downloads raw GEO data and compiles it together into one data frame. ####
+############################################################################################
+#DS: The data set GSE number to download.
+#gpl: The GPL number of the data set to download.
+#gsm: A character string containing numbers indicating the treatment conditions to download.
+#namestr: a list housing the column names for each dataset to download.
+#duprm: if "T", all duplicated rows will be removed. if "F" all duplicate rows will be retained
+GEORNAseqcompileR <- function(DS, gpl, gsm, namestr, duprm = "T"){
+  pb <- txtProgressBar(min = 0, max = length(DS), style = 3)
+  
+  for(a in 1:length(DS)){
+    #### Obtain names of dataset columns ####
+    #########################################
+    n <- namestr[[a]]
+     #### Download GEO data ####
+    ###########################
+    gset <- suppressMessages(getGEO(DS[a], GSEMatrix =TRUE, AnnotGPL=TRUE))
+    if (length(gset) > 1) idx <- grep(gpl[a], attr(gset, "names")) else idx <- 1
+    gset <- gset[[idx]]
+    # make proper column names to match toptable 
+    fvarLabels(gset) <- make.names(fvarLabels(gset))
+    # group names for all samples
+    gsms <- gsm[a]
+    sml <- c()
+    for (i in 1:nchar(gsms)) { sml[i] <- substr(gsms,i,i) }
+    # log2 transform
+    ex <- exprs(gset)
+    qx <- as.numeric(quantile(ex, c(0., 0.25, 0.5, 0.75, 0.99, 1.0), na.rm=T))
+    LogC <- (qx[5] > 100) ||
+      (qx[6]-qx[1] > 50 && qx[2] > 0) ||
+      (qx[2] > 0 && qx[2] < 1 && qx[4] > 1 && qx[4] < 2)
+    if (LogC) { ex[which(ex <= 0)] <- NaN
+    exprs(gset) <- log2(ex) }
+    # set up the data and proceed with analysis
+    sml <- paste("G", sml, sep="")    # set group names
+    fl <- as.factor(sml)
+    gset$description <- fl
+    design <- model.matrix(~ description + 0, gset)
+    colnames(design) <- levels(fl)
+    fit <- lmFit(gset, design)
+    cont.matrix <- makeContrasts(G1-G0, levels=design)
+    fit2 <- contrasts.fit(fit, cont.matrix)
+    fit2 <- eBayes(fit2, 0.01)
+    tT <- topTable(fit2, adjust="fdr", sort.by="B", number=25000000)
+    
+    #### annotate with gene names ####
+    ##################################
+    tT <- subset(tT, select=c("ID","Gene.symbol")) #, ,"adj.P.Val","P.Value","t","B","logFC"
+    ex2 <- data.table(ex)
+    
+    #### Subset columns of interest ####
+    ####################################
+    ex2 <- ex2[,grepl("[0-9]", strsplit(as.character(gsm[a]), split = "")[[1]]), with = FALSE]
+    ex2$ID <- rownames(ex)
+    mer <- merge(tT, ex2, by = "ID")
+    
+    #### retain only data columns and gene names ####
+    #################################################
+    mer <-data.table(mer) %>% setnames((colnames(mer)[grepl("GSM", colnames(mer))]), n)
+    mer <- mer[,2:ncol(mer)]
+    if(a ==1){compdt <- mer}
+    if(a > 1){compdt <- merge(compdt,mer, by = "Gene.symbol", allow.cartesian = TRUE)}
+    #### remove duplicated entries and genes without a name ####
+    compdt <- compdt[!Gene.symbol == ""]    
+    if(duprm == "T"){compdt <- compdt[!duplicated(Gene.symbol),]}
+    setTxtProgressBar(pb, a)
+  }
+  close(pb)
+  return(compdt)
+}
+
+
+#########################################################################################################
+#### This function downloads fold change data from GEO and compiles it together into one data frame. ####
+#########################################################################################################
+#DS: The data set GSE number to download.
+#gpl: The GPL number of the data set to download.
+#gsm: A character string containing numbers indicating the treatment conditions to download.
+#namestr: a list housing the column names for each dataset to download.
+#duprm: if "T", all duplicated rows will be removed. if "F" all duplicate rows will be retained
+
+GEOFCcompileR <- function(DS, gpl, gsm, namestr, duprm = "T"){
+  pb <- txtProgressBar(min = 0, max = length(DS), style = 3)
+  
+  #compdt <- data.table()
+  for(a in 1:length(DS)){
+    #### Obtain names of dataset columns ####
+    #########################################
+    n <- namestr[[a]]
+    
+    #### Download GEO data ####
+    ###########################
+    gset <- suppressMessages(getGEO(DS[a], GSEMatrix =TRUE, AnnotGPL=TRUE))
+    if (length(gset) > 1) idx <- grep(gpl[a], attr(gset, "names")) else idx <- 1
+    gset <- gset[[idx]]
+    # make proper column names to match toptable 
+    fvarLabels(gset) <- make.names(fvarLabels(gset))
+    # group names for all samples
+    gsms <- gsm[a]
+    sml <- c()
+    for (i in 1:nchar(gsms)) { sml[i] <- substr(gsms,i,i) }
+    # eliminate samples marked as "X"
+    sel <- which(sml != "X")
+    sml <- sml[sel]
+    gset <- gset[ ,sel]
+    
+    # log2 transform
+    ex <- exprs(gset)
+    qx <- as.numeric(quantile(ex, c(0., 0.25, 0.5, 0.75, 0.99, 1.0), na.rm=T))
+    LogC <- (qx[5] > 100) ||
+      (qx[6]-qx[1] > 50 && qx[2] > 0) ||
+      (qx[2] > 0 && qx[2] < 1 && qx[4] > 1 && qx[4] < 2)
+    if (LogC) { ex[which(ex <= 0)] <- NaN
+    exprs(gset) <- log2(ex) }
+    # set up the data and proceed with analysis
+    sml <- paste("G", sml, sep="")    # set group names
+    fl <- as.factor(sml)
+    gset$description <- fl
+    design <- model.matrix(~ description + 0, gset)
+    colnames(design) <- levels(fl)
+    fit <- lmFit(gset, design)
+    cont.matrix <- makeContrasts(G1-G0, levels=design)
+    fit2 <- contrasts.fit(fit, cont.matrix)
+    fit2 <- eBayes(fit2, 0.01)
+    tT <- topTable(fit2, adjust="fdr", sort.by="B", number=25000000)
+    
+    #### annotate with gene names ####
+    ##################################
+    #	tT <- subset(tT, select=c("ID","Gene.symbol")) #, ,"adj.P.Val","P.Value","t","B","logFC"
+    
+    #### Subset columns of interest ####
+    ####################################	
+    #ex2 <- data.table(tT[,c("Gene.symbol", "logFC", "P.Value")])
+    ex2 <- data.table(subset(tT, select=c("Gene.symbol", "logFC", "P.Value")))
+    
+    #### rename columns and merge data.table ####
+    #############################################
+    setnames(ex2, colnames(ex2), n)
+    if(a == 1){compdt <- ex2
+    if(duprm == "T"){compdt <- compdt[!duplicated(Gene.symbol),]}
+    }else{
+      compdt <- merge(compdt, ex2, by = "Gene.symbol")
+      if(duprm == "T"){compdt <- compdt[!duplicated(Gene.symbol),]}
+    }
+    setTxtProgressBar(pb, a)
+  }
+  close(pb)
+  return(compdt)
+}
+```
+
+```{r,Error=TRUE}
+#Additional code/plots
+
+# Version info: R 3.2.3, Biobase 2.30.0, GEOquery 2.40.0, limma 3.26.8
+################################################################
+#   Data plots for selected GEO samples
+# BiocManager::install("maptools")
+library(GEOquery)
+library(limma)
+library(umap)
+
+# load series and platform data from GEO
+
+gset <- getGEO("GSE18606", GSEMatrix =TRUE, getGPL=FALSE)
+if (length(gset) > 1) idx <- grep("GPL6480", attr(gset, "names")) else idx <- 1
+gset <- gset[[idx]]
+
+ex <- exprs(gset)
+# log2 transform
+qx <- as.numeric(quantile(ex, c(0., 0.25, 0.5, 0.75, 0.99, 1.0), na.rm=T))
+LogC <- (qx[5] > 100) ||
+          (qx[6]-qx[1] > 50 && qx[2] > 0)
+if (LogC) { ex[which(ex <= 0)] <- NaN
+  ex <- log2(ex) }
+
+# box-and-whisker plot
+dev.new(width=3+ncol(gset)/6, height=5)
+par(mar=c(7,4,2,1))
+title <- paste ("GSE18606", "/", annotation(gset), sep ="")
+boxplot(ex, boxwex=0.7, notch=T, main=title, outline=FALSE, las=2)
+dev.off()
+
+# expression value distribution plot
+par(mar=c(4,4,2,1))
+title <- paste ("GSE18606", "/", annotation(gset), " value distribution", sep ="")
+plotDensities(ex, main=title, legend=F)
+
+# mean-variance trend
+ex <- na.omit(ex) # eliminate rows with NAs
+plotSA(lmFit(ex), main="Mean variance trend, GSE18606")
+
+# UMAP plot (multi-dimensional scaling)
+ex <- ex[!duplicated(ex), ]  # remove duplicates
+ump <- umap(t(ex), n_neighbors = 15, random_state = 123)
+plot(ump$layout, main="UMAP plot, nbrs=15", xlab="", ylab="", pch=20, cex=1.5)
+
+library("maptools")  # point labels without overlaps
+pointLabel(ump$layout, labels = rownames(ump$layout), method="SANN", cex=0.6)
+
+```
+
+
+```{r,Error=TRUE}
+## Including Plots
+
+# You can also embed plots, for example:
+
+#######################
+#### Download data ####
+#######################
+suppressPackageStartupMessages(library(GEOquery))
+suppressPackageStartupMessages(library(limma))
+suppressPackageStartupMessages(library(data.table))
+suppressPackageStartupMessages(library(dplyr))
+suppressPackageStartupMessages(library(scatterplot3d))
+suppressPackageStartupMessages(library(DESeq2))
+suppressPackageStartupMessages(library(gplots))
+suppressPackageStartupMessages(library(vsn))
+suppressPackageStartupMessages(library(ggplot2))
+suppressPackageStartupMessages(library(pheatmap))
+suppressPackageStartupMessages(library(cluster))
+suppressPackageStartupMessages(library(airway))
+suppressPackageStartupMessages(library(sjmisc))
+suppressPackageStartupMessages(library(ggfortify))
+suppressPackageStartupMessages(library(Rgraphviz))
+suppressPackageStartupMessages(library(RColorBrewer))
+
+
+measured <- GEORNAseqcompileR(DS="GSE18606", 
+                              gpl="GPL6480", 
+                              gsm="000000000111111221111121222223333334433334344444", 
+                              namestr=list(
+                                c("ctrl1", "ctrl2", "ctrl3", "ctrl4", "ctrl5", "ctrl6", "ctrl7", "ctrl8", "ctrl9",
+                                  "responder1", "responder2", "responder3", "responder4", "responder5",
+                                  "responder6", "non_responder1", "non_responder2", "responder7", "responder8", 
+                                  "responder9", "responder10", "responder11", "non_responder3", "responder12",
+                                  "non_responder4","non_responder5","non_responder6","non_responder7","non_responder8",
+                                  "responder_IVIG1","responder_IVIG2","responder_IVIG3","responder_IVIG4","responder_IVIG5","responder_IVIG6",
+                                  "non_responder_IVIG1", "non_responder_IVIG2",
+                                  "responder_IVIG7","responder_IVIG8","responder_IVIG9","responder_IVIG10",
+                                  "non_responder_IVIG3",
+                                  "responder_IVIG11",
+                                  "non_responder_IVIG4","non_responder_IVIG5","non_responder_IVIG6","non_responder_IVIG7","non_responder_IVIG8")), 
+                              duprm = "T")
+
+ds <- c("GSE18606", "GSE18606")
+gp <- c("GPL6480", "GPL6480")
+gs <- c("00000000011111111111111111111XXXXXXXXXXXXXXXXXXX", "000000000XXXXXXXXXXXXXXXXXXXX1111111111111111111")
+names <- list(c("Gene.symbol", "logFC", "P.Value"),c("Gene.symbol", "logFC_IVIG", "P.Value_IVIG"))
+dtFC <- GEOFCcompileR(DS=ds, gpl=gp, gsm=gs, namestr=names, duprm = "T")
+
+deg2 <- merge(dtFC, measured, by="Gene.symbol")
+# additional informmation
+my_id <- "GSE18606"
+gse <- getGEO(my_id)
+              
+ex.gse<-exprs(gse[[1]])
+f.gse<-fData(gse[[1]])
+p.gse<-pData(gse[[1]])
+
+summary(ex.gse)
+lex.gse<-log2(ex.gse)
+
+# additional box plot
+boxplot(lex.gse,outline=FALSE)
+boxplot(na.omit(lex.gse),outline=FALSE)
+
+boxplot(na.omit(deg2[,2:53]),outline=FALSE)
+boxplot(na.omit(log2(deg2[,2:53])),outline=FALSE)
+
+summary(deg2)
+boxplot(deg2[,2:53])
+boxplot(na.omit(deg2[,2:53]))
+boxplot(na.omit(log2(deg2[,2:53])),outline=FALSE)
+
+
+
+ex=ex[apply(ex,MARGIN=1, function(x) { any(x!=0) }),]
+ex.rpm = sweep(ex,MARGIN=2,colSums(ex)/1000000,FUN="/")
+oldpar=par(mfrow=c(1,2),las=3,cex.axis=0.8)
+boxplot(log2(ex+1),col="lightgreen")
+boxplot(log2(ex.rpm+1),col="lightgreen")
+par(oldpar)
+# heatmap
+
+cor.exgse<-cor(na.omit(ex.gse),use="c")
+pheatmap(cor.exgse)
+
+# pca <- prcomp(t(ex.gse))
+
+```
+
+```{r,Error=TRUE}
+# a Generate PCA plots of the raw data colored by classification
+
+# dataframe
+deg2.1<-na.omit(deg2)
+deg2.1<-deg2.1 %>% select(sort(names(deg2.1)))
+
+
+control<-deg2.1[,1:9]
+logFC<-deg2.1[,11:12]
+p.value<-deg2.1[,29:30]
+
+nonresponder.IVIG<-deg2.1[,13:20]
+nonresponder<-deg2.1[,21:28]
+gene.symbol<-deg2.1[,10]
+responder.IVIG<-deg2.1[,31:41]
+responder<-deg2.1[,42:53]
+
+
+deg2.s<-as.data.frame(cbind(gene.symbol,p.value,logFC,control,nonresponder.IVIG,responder.IVIG,responder,nonresponder))
+row.names(deg2.s)<- deg2.s[,1]
+
+deg2.sr<-rotate_df(deg2.s, cn = T)
+
+deg2.sr$response <- c(rep("N/A", 4),rep("control", 9),rep("resistant", 8),rep("responsive",23 ),rep("resistant", 8))
+deg2.sr$response.type <- c(rep("N/A", 4),rep("control", 9),rep("acute", 8),rep("acute", 12),rep("convalescent", 11),rep("convalescent", 8))
+deg2.values<-na.omit(deg2.sr[5:52,1:(length(deg2.sr)-2)])
+deg2.response<-deg2.sr$response
+deg2.class<-deg2.sr[5:52,(length(deg2.sr)-1):length(deg2.sr)]
+deg2.stype<-paste(deg2.class[,1],"_",deg2.class[,2])
+deg2.stype[1:9]<-"control"
+deg2.sr$sample.type<-c(rep("N/A", 4),deg2.stype)
+deg2.class$sample.type<-deg2.stype
+deg2.ml<-na.omit(deg2.sr[5:52,])
+
+# box plot
+summary(deg2.1)
+
+classes<-deg2.class[,1]
+cols<-rainbow(length(unique(classes)))
+point.cols<-cols[as.numeric( as.factor(classes))]
+
+
+classes2<-deg2.class[,3]
+cols2<-rainbow(length(unique(classes2)))
+point.cols2<-cols2[as.numeric( as.factor(classes2))]
+
+
+boxplot(t(deg2.values),outline=FALSE,col=point.cols)
+
+boxplot(t(deg2.values),outline=FALSE,col=point.cols2)
+
+oldpar=par(mfrow=c(3,1))
+boxplot(control,outline=FALSE,col="red")
+boxplot(nonresponder.IVIG,outline=FALSE,col="blue")
+boxplot(responder.IVIG,outline=FALSE,col="green")
+par(oldpar)
+
+
+# PCA
+
+pca.rpm=prcomp(deg2.values,retx=TRUE)
+
+scatterplot3d(pca.rpm$x[,1:3],color=point.cols)
+
+sc3=scatterplot3d(pca.rpm$x[,1:3],color=point.cols)
+s3d.coords = sc3$xyz.convert(pca.rpm$x[,1:3])
+text(s3d.coords$x,s3d.coords$y,labels=classes,cex=0.8,pos=4)
+plot(pca.rpm)
+
+
+scatterplot3d(pca.rpm$x[,1:3],color=point.cols2)
+sc4=scatterplot3d(pca.rpm$x[,1:3],color=point.cols2)
+s3d.coords2 = sc4$xyz.convert(pca.rpm$x[,1:3])
+text(s3d.coords2$x,s3d.coords$y,labels=classes2,cex=0.8,pos=4)
+plot(pca.rpm)
+
+autoplot(pca.rpm, data = na.omit(deg2.sr[5:52,]), colour = 'response', label = TRUE, label.size = 3)
+
+autoplot(pca.rpm, data = na.omit(deg2.sr[5:52,]), colour = 'sample.type', label = TRUE, label.size = 3)
+
+
+vars=apply(deg2.values,2,var)
+
+pca.2 = prcomp((deg2.values[,vars>1,]),retex=TRUE)
+oldpar=par(mfrow=c(2,2),mar=c(4,4,1,1))
+plot(pca.2$x[,1:2], pch=19, cex=1.5,col=point.cols)
+legend(-15,3,col=cols,legend=unique(classes),cex=0.5,pch=19)
+plot(pca.2$x[,c(1,3)], pch=19, cex=1.5,col=point.cols)
+plot(pca.2$x[,2:3], pch=19, cex=1.5,col=point.cols)
+scatterplot3d(pca.2$x[,1:3],color=point.cols,pch=19)
+text(s3d.coords$x,s3d.coords$y,labels=classes,cex=0.8,pos=4)
+
+oldpar=par(mfrow=c(2,2),mar=c(4,4,1,1))
+plot(pca.2$x[,1:2], pch=19, cex=1.5,col=point.cols2)
+legend(-15,3,col=cols,legend=unique(classes2),cex=0.5,pch=19)
+plot(pca.2$x[,c(1,3)], pch=19, cex=1.5,col=point.cols2)
+plot(pca.2$x[,2:3], pch=19, cex=1.5,col=point.cols2)
+scatterplot3d(pca.2$x[,1:3],color=point.cols2,pch=19)
+text(s3d.coords$x,s3d.coords$y,labels=classes2,cex=0.8,pos=4)
+
+
+
+
+```
+
+
+```{r, Error=TRUE}
+# b Find a method of measurement that will allow you to monitor clustering efficiency of the raw data 
+
+# heatmap
+
+labels=rownames(data.matrix(deg2.values))
+corr.dist=function(x) { as.dist(1-cor(t(x))) }
+
+vars=apply(deg2.values,2,var)
+
+select=order(vars,decreasing=T)[1:100]
+
+redgreen <- function(n) {
+ c(hsv(h=2/6, v=seq(1,0,length=n/2) ), hsv(h=0/6, v=seq(0,1,length=n/2)) )
+}
+
+
+heatmap.2(data.matrix(deg2.values[,select]),trace="none",
+labCol=labels,labRow=F,col=redgreen(100),scale="row",
+margins=c(7,7))
+
+
+# clustering
+
+d2<-dist(deg2.values)
+
+oldpar=par(mfrow=c(1,1))
+plot(hclust(d2,method="average"),label=rownames(deg2.values))
+plot(hclust(d2,method="ward.D2"),label=rownames(deg2.values))
+par(oldpar)
+
+
+
+hc=hclust(corr.dist(deg2.values[,select]),method="ward.D2")
+plot(hc,label=rownames(deg2.values))
+rect.hclust(hc,h=3)
+clusters=cutree(hc,h=3)
+
+
+
+# k means
+
+
+fit=kmeans(deg2.values,2)
+fit$withinss
+fit$withinss/fit$totss
+fit$tot.withinss/fit$tots
+
+fit2=kmeans(deg2.values,5)
+fit$withinss
+fit$withinss/fit$totss
+fit$tot.withinss/fit$tots
+
+
+fit.e=kmeans(t(deg2.values),2)
+fit.e$withinss
+fit.e$withinss/fit.e$totss
+fit.e$tot.withinss/fit.e$tots
+
+fit2.e=kmeans(t(deg2.values),5)
+fit2.e$withinss
+fit2.e$withinss/fit2.e$totss
+fit2.e$tot.withinss/fit2.e$tots
+
+```
+
+
+```{r,Error=TRUE}
+
+# c) Take serial cuts through the data and return the cut that optimizes the distance between the two classifications.
+
+
+library(tximport)
+library(DESeq2)
+library(tidyverse)
+library(limma)
+library(breastCancerNKI)
+suppressPackageStartupMessages(library(Biobase))
+library(e1071)
+
+
+
+# volcano plot
+ggplot(data=deg2, aes(x=deg2$logFC, y=deg2$P.Value)) + geom_point()
+
+# creating svm
+ex.gse<-exprs(gse[[1]])
+
+ge=ex.gse
+
+e.m=factor(deg2.sr$sample.type[5:52])
+levels(e.m)=c(0,1,2,3,4)
+
+# pvalue
+tt.pvals=p.value$P.Value
+
+# dataframe
+df=(as.data.frame(t(ge[order(tt.pvals),])))
+
+
+# creating assess.prediction function
+assess.prediction=function(truth,predicted) {
+ predicted = predicted[ ! is.na(truth) ]
+ truth = truth[ ! is.na(truth) ]
+ truth = truth[ ! is.na(predicted) ]
+ predicted = predicted[ ! is.na(predicted) ]
+ cat("Total cases that are not NA: ",length(truth),"\n",sep="") 
+ cat("Correct predictions (accuracy): ",sum(truth==predicted),
+ "(",signif(sum(truth==predicted)*100/length(truth),3),"%)\n",sep="")
+
+ TP = sum(truth==1 & predicted==1)
+ TN = sum(truth==0 & predicted==0)
+ FP = sum(truth==0 & predicted==1)
+ FN = sum(truth==1 & predicted==0)
+ P = TP+FN 
+ N = FP+TN 
+ cat("TPR (sensitivity)=TP/P: ", signif(100*TP/P,3),"%\n",sep="")
+ cat("TNR (specificity)=TN/N: ", signif(100*TN/N,3),"%\n",sep="")
+ cat("PPV (precision)=TP/(TP+FP): ", signif(100*TP/(TP+FP),3),"%\n",sep="")
+ cat("FDR (false discovery)=1-PPV: ", signif(100*FP/(TP+FP),3),"%\n",sep="")
+ cat("FPR =FP/N=1-TNR: ", signif(100*FP/N,3),"%\n",sep="")
+}
+
+# creating do.check function
+do.check=function(data,model) {
+ if ( is.null(data) ) { stop("New data must be specified") }
+ if ( is.null(model) ) {
+ stop("The model has not been trained yet!")
+ }
+}
+
+# creating predict function
+predict = function(M,newdata,...) {
+ if ( inherits(M,"svm") && ! is.null(newdata) ) {
+ has.na = apply(newdata,1,function(x) any(is.na(x)) )
+ has.data = which(! has.na);
+ has.na = which( has.na)
+ pred = stats::predict(M,newdata[has.data,,drop=F],...)
+ pred.with.na = pred[1] 
+ pred.with.na[ has.data ] = pred
+ pred.with.na[ has.na ] = NA
+ pred.with.na 
+ } else {
+ stats::predict(M,newdata,...)
+ }
+}
+
+# creating predictor.svm function
+predictor.SVM = list(
+ model = NULL,
+ train = function(f,data,...) {
+ predictor.SVM$model <<- svm(f, data,...) 
+ },
+ predict=function(newdata=NULL) {
+ do.check(newdata,predictor.SVM$model)
+ as.numeric( 
+ as.character(predict(predictor.SVM$model,newdata)) > 0.5
+ )
+}
+)
+
+# creating cross validation  function
+cross.validate=function(predictor,formula,data=NULL,
+ method="random", N=1000, n.out=5,...) {
+ if ( is.null(data) ) { stop("data must be specified") }
+ f.str = deparse(formula)
+ dependent.name = sub("\\s*~.*","",f.str)
+ if ( ! dependent.name %in% names(data) ) {
+ dependent.data = get(dependent.name,envir=environment(formula))
+ data=cbind(dependent.data,data)
+ names(data)[1] = dependent.name
+ } else {
+ ind = match(dependent.name,names(data))
+ data = cbind( data[,ind,drop=F],data[,-ind,drop=F] )
+ }
+ truth = data[,dependent.name] 
+ truth = truth[0] 
+ prediction=numeric()
+ 
+ for ( i in 1:N ) {
+ leave.out = sample(nrow(data),size=n.out)
+ training.data = data[-leave.out,,drop=F]
+ test.data = data[leave.out,,drop=F]
+ predictor$train(formula , data=training.data,...)
+ pred=predictor$predict(test.data[,-1,drop=F])
+ truth[ (length(truth)+1):(length(truth)+n.out) ] = 
+ test.data[,dependent.name]
+ prediction = c(prediction, pred)
+ }
+ list(truth=truth,prediction=prediction)
+}
+
+# svm
+M=svm(e.m~.,df[,1:20,drop=F],kernel="linear")
+assess.prediction(e.m,predict(M,df[,1:20]))
+
+
+# running predictor svm 
+predictor.SVM$train(e.m ~ . ,df[1:20])
+assess.prediction(e.m, predictor.SVM$predict(df[1:20]))
+
+# running cross validation
+cv.SVM.20=cross.validate(predictor.SVM, e.m ~ . , df[1:20])
+assess.prediction(cv.SVM.20$truth,cv.SVM.20$prediction)
+
+cv.SVM.20r=cross.validate(predictor.SVM, e.m ~ . , df[1:20],kernel="radial")
+assess.prediction(cv.SVM.20r$truth,cv.SVM.20r$prediction)
+
+# associated genes
+gene.logfc<-deg2[,c(1,2,4)]
+gene.pvalue<-deg2[,c(1,3,5)]
+
+deg.fc<-which(abs(gene.logfc[,3])> 1)
+deg.p<-which(gene.pvalue[,3]<0.05)
+gene.p<-deg.fc[deg.fc %in% deg.p]
+
+f.deg=as.numeric()
+for (x in gene.p) {
+  f.deg<-gene.logfc[gene.p,1]
+}
+f.deg
+```
+

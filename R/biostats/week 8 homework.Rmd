@@ -1,0 +1,219 @@
+---
+title: "week 8 homework assignment"
+author: "Christopher Tran"
+date: "11/24/2021"
+output: html_document
+---
+1. (30) Assess effect of sex-relapse interaction on the expression for the gene with the most significant main effect of sex on the expression (in ALL dataset).
+
+```{r,error=TRUE  }
+# call library and setting variable
+library(ALL)
+data(ALL)
+s<-pData(ALL)$sex
+r<-pData(ALL)$relapse
+sample<-exprs(ALL)[1,]
+
+# create dataframe
+df.tmp1 <- data.frame(expr.max.at=exprs(ALL)[1,],sex=pData(ALL)$sex,relapse=pData(ALL)$relapse)
+
+# anova and setting variable for pvalue
+
+pvalue<-anova(lm(exprs(ALL)[1,]~s*r,df.tmp1))
+pvalue2<-anova(lm(exprs(ALL)[1,]~s+r,df.tmp1))
+pvalue2["Pr(>F)"]
+pvalue["Pr(>F)"]
+
+
+pvals1 <- apply(exprs(ALL),1,function(x)anova(lm(x~s*r,df.tmp1))[1,"Pr(>F)"])
+pvals2 <- apply(exprs(ALL),1,function(x)anova(lm(x~s+r,df.tmp1))[1,"Pr(>F)"])
+min1<-exprs(ALL)[which.min(pvals1),]
+min2<-exprs(ALL)[which.min(pvals2),]
+
+# anova of values
+anova(lm(min1~s+r))
+anova(lm(min1~s*r))
+
+anova(lm(min2~s+r))
+anova(lm(min2~s*r))
+
+# boxplot
+boxplot(min1~s)
+boxplot(min2~s)
+
+```
+Looking at the pvalues and plots, we can notice there are differences within the female and male in the most significant gene. There seems to show more outliers in the female than the male.
+
+2. (30) Using model coefficients and model matrix (you do not have to generate the latter manually, you can retrieve it instead from the fitted object): calculate predictions for the regression model of days-to-remission in ALL dataset as a function of fusion protein status and expression level of gene 41690_at that allows interaction between these two variables. Compare result with the one obtained from the direct call to predict.
+
+```{r,error=TRUE  }
+# setting variables
+library(ALL)
+data(ALL)
+ALL.pdat <- pData(ALL)
+s<-pData(ALL)$sex
+r<-pData(ALL)$relapse
+date.cr.chr <- as.character(ALL.pdat$date.cr)
+diag.chr <- as.character(ALL.pdat$diagnosis)
+date.cr.t <- strptime(date.cr.chr,"%m/%d/%Y")
+diag.t <- strptime(diag.chr,"%m/%d/%Y")
+days2remiss <- as.numeric(date.cr.t - diag.t)
+x.d2r <- as.numeric(days2remiss)
+exprs.41690 <- exprs(ALL)["41690_at",]
+
+# create dataframe
+d2r.41690 <- data.frame(G=exprs.41690,D2R=x.d2r)
+d2r.41690<-na.omit(d2r.41690)
+
+# pulling designated gene and creating lm model
+fus.prot <- pData(ALL)$"fusion protein" 
+boxplot(exprs(ALL)["41690_at",]~fus.prot,main="41690_s_at")
+lm.41690.s.at.fp <- lm(exprs(ALL)["41690_at",]~fus.prot) 
+lm.41690.s.at.fp
+lm.41690.s<-lm(x.d2r~exprs(ALL)["41690_at",]*fus.prot)
+
+# summary and anova of gene
+summary(lm.41690.s)
+
+anova(lm.41690.s)
+
+predict(lm.41690.s)
+
+summary(lm.41690.s.at.fp)$coef
+
+anova(lm.41690.s.at.fp)
+
+# dataframe with no na and predictoin
+df.tmp <- data.frame(model.matrix(lm.41690.s.at.fp),fus.prot[!is.na(fus.prot)])
+colnames(df.tmp) <- c("Intercept","p190.p210","p210","FP")
+df.tmp
+
+
+# table of data
+table(pData(ALL)[,c("sex","relapse")])
+
+# creating other dataframe
+df.tmp <- data.frame(expr.41690.at=exprs(ALL)["41690_at",],sex=pData(ALL)$sex,relapse=pData(ALL)$relapse)
+
+# anova
+anova(lm(expr.41690.at~sex*relapse,df.tmp))
+
+# box plot of data
+boxplot(expr.41690.at~sex+relapse,df.tmp) 
+boxplot(expr.41690.at~relapse,df.tmp) 
+
+# model matrix, summary and mean
+model.matrix(lm(expr.41690.at~sex*relapse,df.tmp))
+
+model.matrix(lm(expr.41690.at~sex*relapse,df.tmp))
+
+summary(lm(expr.41690.at~sex*relapse,df.tmp))$coef
+summary(lm(expr.41690.at~sex*relapse,df.tmp))
+
+mean(df.tmp$expr.41690.at[df.tmp$sex=="F" & df.tmp$relapse==F],na.rm=T)
+
+mean(df.tmp$expr.41690.at[df.tmp$sex=="M" & df.tmp$relapse==F],na.rm=T)
+
+
+```
+Looking at the graphs and pvalues, The predictions seem to be a little off. I am not sure if this was part of my code, but they seem relatively close.
+
+3. (40) For each gene in ALL dataset fit a model of days-to-remission vs. gene expression and BT status (use only two coarse-grained levels, B and T, for all the subtypes B1/T2/…, as we did in earlier homework). Calculate anova p-values for the interaction between gene expression level and BT status variables in thesemodels. For the obtained array of p-values calculate FDR and describe results in writing. Hint: you may need to use our “classical” approach and run lm() multiple times: lmFit() is designed for fitting expression data against explanatory variables, and in this case we cannot turn the model around easily in order to make it suitable for lmFit().
+
+```{r,error=TRUE  }
+# calling library and setting cariabels
+library(ALL)
+library(limma)
+library(qvalue)
+data(ALL)
+ALL.pdat <- pData(ALL)
+date.cr.chr <- as.character(ALL.pdat$date.cr)
+diag.chr <- as.character(ALL.pdat$diagnosis)
+days2remiss <- as.numeric(date.cr.t - diag.t)
+sample<-exprs(ALL)
+x.d2r<-as.numeric(days2remiss)
+bt <- factor(substring(ALL.pdat$BT,1,1))
+
+# calucating pvalue
+xpval<-apply(sample,1,function(x)anova(lm(days2remiss~x*bt))[1,"Pr(>F)"])
+
+# calculate qvalue from pvalue
+qxpval<-qvalue(xpval)$qvalue
+
+# plot and graph value
+hist(qxpval)
+plot(qxpval)
+
+```
+
+4. (extra 20) Run logistic regression analysis on gene expression levels and sex attribute in ALL dataset. Identify gene with the most significant effect on patient gender by this approach.
+```{r,error=TRUE  }
+library(ALL)
+data(ALL)
+# setting variable to na 
+b.sex <- !is.na(pData(ALL)$sex)
+sex.wo.na <- pData(ALL)$sex[b.sex]
+exprs.wo.na <- exprs(ALL)[,b.sex]
+# getting most significant gene
+ge<-exprs.wo.na[min(exprs.wo.na),]
+# lm model and summary
+glm.ms.at <- glm(sex.wo.na~ge, family="binomial")
+summary(glm.ms.at)
+
+old.par<-par(ps=16)
+plot(ge,sex.wo.nas)
+br <- seq(min(ge),max(ge),by=(max(ge)-min(ge))/10)
+cnt.1 <- hist(ge[sex.wo.na],breaks=br)$counts
+cnt.0 <- hist(ge[!sex.wo.na],breaks=br)$counts
+points((br[1:10]+br[2:11])/2, 
+ cnt.1/(cnt.0+cnt.1),pch=19,col='red',cex=1.2)
+segments(br[1:10], cnt.1/(cnt.0+cnt.1),
+br[2:11], cnt.1/(cnt.0+cnt.1),col='red')
+y.pred <- predict(glm.ms.at)
+points(ge, exp(y.pred)/(1+exp(y.pred)),col="blue",pch=’+’)
+par(old.par)
+
+```
+
+
+5. (extra 20) Run survival analysis with NA’s in the vector of days-to-remission replaced with end of the study value – explore effect of the choice of this date on the significance of the results.
+```{r,error=TRUE }
+# load library
+library(ALL)
+library(survival) 
+# extract days-to-remission:
+data(ALL)
+ALL.pdat <- pData(ALL)
+date.cr.chr <- as.character(ALL.pdat$date.cr)
+diag.chr <- as.character(ALL.pdat$diagnosis)
+date.cr.t <- strptime(date.cr.chr,"%m/%d/%Y")
+diag.t <- strptime(diag.chr,"%m/%d/%Y")
+d2r <- as.numeric(date.cr.t - diag.t)
+date.cr.chr <- as.character(ALL.pdat$date.cr)
+diag.chr <- as.character(ALL.pdat$diagnosis)
+days2remiss <- as.numeric(date.cr.t - diag.t)
+sample<-exprs(ALL)
+x.d2r<-as.numeric(days2remiss)
+str(ALL.pdat)
+# start the survival analysis:
+d2r.ind <-as.numeric(!is.na(d2r)) # T at positions where d2r has data
+d2r.surv <- Surv(d2r,d2r.ind)
+d2r.surv1 <- Surv(d2r)
+# plot
+
+plot(survfit(d2r.surv~sex,data=pData(ALL)),col=c(2,4),xlab="Days",ylab="1-p(remission)")
+legend(100,0.8,legend=c('M','F'),lwd=1,col=c('blue','red'))
+
+coxph(Surv(d2r,as.numeric(!is.na(d2r)))~sex, data=pData(ALL))
+
+plot(survfit(d2r.surv1~days2remiss,data=pData(ALL)),col=c(2,4),xlab="Days",ylab="1-p(remission)")
+legend(100,0.8,legend=c('Day to remission'),lwd=1,col=c('blue','red'))
+
+coxph(Surv(d2r)~days2remiss, data=pData(ALL))
+
+
+
+
+```
+
+

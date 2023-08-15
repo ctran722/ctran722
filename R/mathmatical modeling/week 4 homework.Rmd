@@ -1,0 +1,483 @@
+---
+title: "week 4 homework"
+author: "Christopher Tran"
+date: "2/2/2022"
+output: html_document
+---
+1. (15) Choosing appropriate visualization. The commands shown below are very similar to those used in the notes. Gene clustering is performed, but the two 
+heatmaps look completely useless and uninterpretable and they clearly don’t add anything to our understanding of the structure and patters in the data. Why cannot we see clusters? Is there anything wrong? Is there anything missing? Or it’s the uncomfortable truth – the data and the clusters are what they are, they just can’t be visualized well enough? Examine the commands and the plots they generate and explain in your own words, no need to write any code (although you might if you feel you have to).
+
+a. select=order(vars,decreasing=T)[1:200];heatmap.2(assay(rld[select,]),trace="none",labCol=labels,labRow=F,col=redgreen(100),ColSideColors=rep(c("green","red"),4),margins=c(7,7),distfun=corr.dist)
+
+b. select=order(vars,decreasing=T)[1:200];heatmap.2(assay(rld[select,]),trace="none",labCol=labels,labRow=F,col=redgreen(100),scale="row",ColSideColors=rep(c("green","red"),4),margins=c(7,7))
+
+```{r, error=TRUE}
+# a
+# calling libraries ans setting variables
+library(Homo.sapiens)
+library(RColorBrewer)
+library(topGO)
+library("Rgraphviz")
+library(airway)
+library(gplots)
+suppressMessages(library(DESeq2))
+library(vsn)
+
+data(airway)
+countdata = assays(airway)[[1]]
+countdata[1:3,1:4]
+colData(airway)[1:3,1:6]
+
+
+dds=DESeqDataSet(airway,design = ~cell+dex)
+dds <- dds[ rowSums(counts(dds)) > 1, ]
+dds=estimateSizeFactors(dds)
+rld=rlog(dds)
+
+
+countdata=countdata[rowSums(countdata)>0,]
+countdata.rpm = sweep(countdata,2,colSums(countdata)/1000000,FUN="/")
+
+countdata.deseq = sweep(countdata,2,sizeFactors(dds),FUN="/")
+
+# create labels
+labels=paste(colData(airway)[,"cell"],
+ ifelse(colData(airway)[,"dex"]=="trt","T","U"),sep=":")
+oldpar=par(mfrow=c(1,2))
+
+vsd <- varianceStabilizingTransformation(dds)
+
+corr.dist=function(x) { as.dist(1-cor(t(x))) }
+vars=apply(assay(rld),1,var)
+means=apply(assay(rld),1,mean)
+
+# creating heat map of first data
+select=order(vars,decreasing=T)[1:100]
+
+heatmap.2(assay(rld[select,]),trace="none",labCol=labels,labRow=F,
+ col=redgreen(100),scale="row",
+ColSideColors=rep(c("green","red"),4),margins=c(7,7),distfun=corr.dist)
+
+
+# org.Hs.eg.db[1:3]
+columns(org.Hs.eg.db)[1:3]
+
+# select(org.Hs.eg.db,keys=rownames(assay(rld))[1:3],keytype="ENSEMBL",columns=c("ENSEMBL","SYMBOL","GENENAME"))
+
+# gathering gene names
+gene.names = select(org.Hs.eg.db,keys=rownames(assay(rld)),
+ keytype="ENSEMBL",columns=c("ENSEMBL","SYMBOL", "GENENAME"))
+sort(table(gene.names[,1]),decreasing=T)[1:5]
+
+gene.names = do.call(rbind, by(gene.names,IND=gene.names[,1],
+ FUN=function(x) { x[1,] } ) )
+all(gene.names[,1]==rownames(assay(rld)))
+
+select=order(vars,decreasing=T)[1:40]
+
+# setting heatmap
+heatmap.2(assay(rld[select,]),trace="none",labCol=labels,ColSideColors=rep(c("green","red"),4), col=redgreen(100),scale="row",labRow=gene.names[select,2],distfun=corr.dist,margin=c(7,7),key=T)
+
+
+select=order(vars,decreasing=T)[1:200]
+
+heatmap.2(assay(rld[select,]),trace="none",labCol=labels,labRow=F,col=redgreen(100),ColSideColors=rep(c("green","red"),4),margins=c(7,7),distfun=corr.dist,key=T)
+
+# b
+select=order(vars,decreasing=T)[1:200]
+
+heatmap.2(assay(rld[select,]),trace="none",labCol=labels,labRow=F,col=redgreen(100),scale="row",ColSideColors=rep(c("green","red"),4),margins=c(7,7),key=T)
+
+```
+
+
+
+Looking at the both the heatmap, I know A does not have the the labels and B does not have labels as well as the Cor distance function. This is essential in creating our heatmap as the labels gathers our clusters and the distance helps create the location of the clusters on our heatmap.
+
+
+2. (25) Let us further confirm (or disprove) our theory about N061011 cell line being actually derived from a female donor. The human annotation database 
+org.Hs.eg.db has column CHR, the value in this field specifies the chromosome, on which the gene is situated. Use this annotation to find the chromosome for each gene in the dataset rld (as computed in the Notes), select the subset of the expression (count) data limited to all genes located on Y chromosome and nothing else. Plot a heatmap of these genes’ expression values. Comment on the results.
+
+
+```{r,error=TRUE}
+# calling libraries and setting variables
+library(Homo.sapiens)
+library(RColorBrewer)
+library(topGO)
+library("Rgraphviz")
+library(airway)
+library(gplots)
+suppressMessages(library(DESeq2))
+library(vsn)
+
+data(airway)
+countdata = assays(airway)[[1]]
+countdata[1:3,1:4]
+colData(airway)[1:3,1:6]
+
+
+dds=DESeqDataSet(airway,design = ~cell+dex)
+dds <- dds[ rowSums(counts(dds)) > 1, ]
+dds=estimateSizeFactors(dds)
+
+rld=rlog(dds)
+
+
+countdata=countdata[rowSums(countdata)>0,]
+countdata.rpm = sweep(countdata,2,colSums(countdata)/1000000,FUN="/")
+
+countdata.deseq = sweep(countdata,2,sizeFactors(dds),FUN="/")
+
+labels=paste(colData(airway)[,"cell"],
+ ifelse(colData(airway)[,"dex"]=="trt","T","U"),sep=":")
+oldpar=par(mfrow=c(1,2))
+
+vsd <- varianceStabilizingTransformation(dds)
+
+corr.dist=function(x) { as.dist(1-cor(t(x))) }
+vars=apply(assay(rld),1,var)
+means=apply(assay(rld),1,mean)
+
+
+columns(org.Hs.eg.db)
+
+
+# select(org.Hs.eg.db,keys=rownames(assay(rld)),keytype="ENSEMBL",columns=c("ENSEMBL","SYMBOL","GENENAME","CHR"))
+# calling gene names
+gene.names = select(org.Hs.eg.db,keys=rownames(assay(rld)),
+ keytype="ENSEMBL",columns=c("ENSEMBL","SYMBOL", "GENENAME","CHR"))
+gene.names = do.call(rbind, by(gene.names,IND=gene.names[,1],
+ FUN=function(x) { x[1,] } ) )
+
+#subseting for just Y chromosomes  
+gene.names<-gene.names[gene.names$CHR == "Y",]
+# gene.names<-subset(gene.names, gene.names$CHR=="Y")
+
+gene.names<-na.omit(gene.names)
+# Ygene.names
+# gene.names
+
+sort(table(gene.names[,1]),Decreasing=T)[1:5]
+
+gene.names1<-as.vector(gene.names$ENSEMBL)
+
+# all(gene.names[,1]==assay(rld)[rownames(gene.names1,])
+# colnames(gene.names)
+
+# generate heatmap
+Y.genea<-assay(rld)[gene.names1,]
+y.vars<-apply(Y.genea,1,var)
+
+select=order(y.vars,decreasing=T)
+
+heatmap.2(Y.genea[select,],trace="none",labCol=labels,
+ ColSideColors=rep(c("green","red"),4), 
+ col=redgreen(100),scale="row",labRow=gene.names[select,3],
+ distfun=corr.dist,margin=c(7,7),key=T)
+
+
+
+
+```
+
+
+Looking through our Y clusters to cluster in certain areas of our heatmap. I found it quite interesting as the first part section of our heatmap is very low. I found this pattern to be quite interesting as our clusters are generally on the tail end of our heatmap.
+
+
+3. (25) Using the results obtained in the Notes (you can use the same cutoff of 300 genes with highest variances), identify the cluster(s) of genes that consistently go (a) up or (b) down as the result of the treatment, regardless of the cell line. For these two sets of genes (“up” and “down”), reproduce the GO enrichment analysis and comment on the findings. Do not expect anything striking, everybody does enrichment analysis, and everybody hates it as it is quite common to end up with a number of enriched categories that are neither independent (parent-child relationships) nor particularly interesting or easily interpretable. We are still in the domain of exploratory analysis, the results may or may not reveal something interesting and new.
+
+
+```{r, error=TRUE}
+# calling libraries and setting variables
+library(Homo.sapiens)
+library(RColorBrewer)
+library(topGO)
+library("Rgraphviz")
+library(airway)
+library(gplots)
+suppressMessages(library(DESeq2))
+library(vsn)
+
+data(airway)
+countdata = assays(airway)[[1]]
+countdata[1:3,1:4]
+colData(airway)[1:3,1:6]
+
+
+dds=DESeqDataSet(airway,design = ~cell+dex)
+rld=rlog(dds)
+dds <- dds[ rowSums(counts(dds)) > 1, ]
+dds=estimateSizeFactors(dds)
+
+countdata=countdata[rowSums(countdata)>0,]
+countdata.rpm = sweep(countdata,2,colSums(countdata)/1000000,FUN="/")
+
+countdata.deseq = sweep(countdata,2,sizeFactors(dds),FUN="/")
+
+labels=paste(colData(airway)[,"cell"],
+ ifelse(colData(airway)[,"dex"]=="trt","T","U"),sep=":")
+oldpar=par(mfrow=c(1,2))
+
+vsd <- varianceStabilizingTransformation(dds)
+
+corr.dist=function(x) { as.dist(1-cor(t(x))) }
+vars=apply(assay(rld),1,var)
+means=apply(assay(rld),1,mean)
+
+# create our dentrogram 
+select=order(vars,decreasing=T)[1:300]
+
+hc=hclust(corr.dist(assay(rld[select,])),method="ward.D2")
+plot(hc,lab=F)
+rect.hclust(hc,h=2)
+clusters=cutree(hc,h=2)
+clusters[1:5]
+all(names(clusters)==gene.names[select,1])
+
+rcol = brewer.pal(10,"Paired")[clusters]
+# creating our heatmap
+c=hclust(corr.dist(assay(rld[select,])),method="ward.D2")
+plot(hc,lab=F)
+heatmap.2(assay(rld[select,]),trace="none",labCol=labels,
+ ColSideColors=rep(c("green","red"),4),col=redgreen(100),
+ scale="row",labRow=F,distfun=corr.dist,margin=c(7,7),
+ key=T, hclustfun=function(x) { hclust(x,method="ward.D2")},
+ RowSideColors=rcol)
+legend(0.65,12 ,legend=1:10,pch=20,col=brewer.pal(10,"Paired"))
+
+```
+
+
+
+```{r, error=TRUE}
+# generate genes up and down and create enrichment
+genes.up = names(clusters)[clusters==3]
+genes.down = names(clusters)[ clusters %in% c(10) ]
+
+all.gene.ids = rownames(assay(rld))
+all.genes.up = factor(as.integer( all.gene.ids %in% genes.up ) )
+names(all.genes.up) = all.gene.ids 
+godata.up=new("topGOdata",ontology="BP",allGenes=all.genes.up,annot=annFUN.org,
+ mapping="org.Hs.eg.db",ID="ENSEMBL")
+resultFisher.up <- runTest(godata.up, algorithm = "classic", 
+ statistic = "fisher")
+GenTable(godata.up,classicFisher=resultFisher.up,
+ ranksOf="classicFisher",topNodes=20)
+showSigOfNodes(godata.up, score(resultFisher.up), firstSigNodes = 10, 
+ useInfo = 'all')
+
+all.genes.down = factor(as.integer( all.gene.ids %in% genes.down ) )
+names(all.genes.down) = all.gene.ids 
+godata.down=new("topGOdata",ontology="BP",
+ allGenes=all.genes.down,annot=annFUN.org,
+ mapping="org.Hs.eg.db",ID="ENSEMBL")
+resultFisher.down <- runTest(godata.down, algorithm = "classic", 
+ statistic = "fisher")
+GenTable(godata.down,classicFisher=resultFisher.down,
+ ranksOf="classicFisher",topNodes=20)
+showSigOfNodes(godata.down, score(resultFisher.down), firstSigNodes = 10, 
+ useInfo = 'all')
+```
+Looking at the enrichment analysis for both up and down it definitely shows a different pattern within the genes. I noticed with the down there are more genes moving in different directions as opposed to the up genes which is going in one motion within its clusters. 
+
+
+
+4. (35) So far we have been using DESeq package in order to compute regularized transformation on our data and then we went ahead with exploratory analysis/QC of the dataset. There is nothing wrong with that (in fact, this is a right thing to do, and as we have seen there might be many unexpected things lurking in the data), but the primary purpose of DESeq package is calculating differential expression (DE), i.e. expression level changes between conditions, in a statistically sound way. All the methods we have been using are actually provided by DESeq as very useful add-ons and QC mechanisms. Evaluating DE with DESeq (at least in the most basic form) is extremely simple, simpler in fact that many things we have done. Run the following commands (dds is the DeSeqDataSet object we have created in the 
+
+Notes when we first loaded the airway dataset):
+
+# you can check that the “first” factor level in dds$dex 
+# is “trt” (just type dds$dez to see). DESeq will consider 
+# the first level in the factor specified in experimental 
+# design as “reference” and will calculate 
+# expression level changes with respect to it. Here we change
+# the order of the levels, so that “untrt” is the first one and
+# now expression changes will be calculated wrt untreated
+dds$dex = relevel(dds$dex,"untrt")
+# this is all it takes to analyze the dataset! This single 
+# call packs quite sophisticated statistical model under 
+# the hood. NOTE: we have to use raw counts (dds) here, 
+# DESeq will apply all the regularizing transformations and 
+# variance shrinkage internally, as needed. The rlog() 
+# and other functions we used are provided as convenience 
+# add-ons so that we could do our own QC; never give DESeq
+# transformed data for running DE analysis!
+dds <- DESeq(dds)
+res <- results(dds)
+head(res)
+# res is just a fancied up data frame. Add gene symbol 
+# column using the gene.names table we computed in the notes:
+res$Symbol=gene.names[,2]
+head(res)
+# order by adjusted p-value and print few most significant
+# diff-expressed genes:
+head(res[order(res$padj),])
+
+a. Using the results of DE calculations (table res) let us define differentially expressed genes as genes that exhibit at least two-fold expression change between treated and untreated conditions (i.e.absolute log-fold change 1 or more) and have adjusted p-value for the significance of that change 0.001 or better. You can access the data you need as res$log2FoldChange and res$padj (note that some padj are NA). Note that the order of rows in the results table res is the same as the row order in the original data the results were computed from (dds), and thus it is also the same as the order in our manually transformed data table rld. Thus you can conveniently build the vector select using the new criteria as described above and use it to subset rld dataset, just like we did in the Notes. Plot the heatmap of so defined DE genes and comment on it. 
+
+b. When performing unsupervised analysis/QC on the data in their entirety we have certainly seen many interesting and/or concerning patterns. The expected (and most trivial) pattern of genes that are reasonably constant across cell lines but exhibit strong changes upon treatment was just one of them. But in our analysis we were using unsupervised clustering on potentially meaningful set of genes (those with highest variances, with an arbitrary cutoff of, say, top 300), defined actual clusters (drew a “proper” cut line) based on visual inspection of the heatmap… That’s a lot of assumptions and empirical procedures. How much noise do we let in when performing this type of free data exploration not always bound by robust statistical criteria? The answer may actually vary a lot, depending on the quality of the data and on researcher’s own diligence and commitment to crossvalidation of different approaches. But we can get at least some idea in our particular case: in part (a) of this problem we defined a set of DE genes for treated/untreated conditions. This time define two sets of DE genes, (genes.de.up, genes.de.down) using the same cutoffs as in part (a), one set should contain only genes that are upregulated in the treated samples, the other should consist of genes downregulated upon the treatment. Now compare these two lists to the corresponding lists of up- and downregulated genes (also upon treatment) that we have built in Problem 3 based solely upon the ad-hoc procedure of top-variance gene selection, clustering, and visual inspection. In other words, we want to see how well our clusters of treatment-related genes defined in Problem 3 correspond to DE genes calculated with more statistical rigor. Present your answer as total number of genes in treatment-up (treatment-down) cluster from Problem 3, and the number or percentage of those genes also found in the list of DE up- (down-) regulated genes defined in this problem.
+
+```{r, error=TRUE}
+# calling libraries and setting variables
+library(Homo.sapiens)
+library(RColorBrewer)
+library(topGO)
+library("Rgraphviz")
+library(airway)
+library(gplots)
+suppressMessages(library(DESeq2))
+library(vsn)
+
+data(airway)
+countdata = assays(airway)[[1]]
+countdata[1:3,1:4]
+colData(airway)[1:3,1:6]
+
+
+dds=DESeqDataSet(airway,design = ~cell+dex)
+dds <- dds[ rowSums(counts(dds)) > 1, ]
+dds=estimateSizeFactors(dds)
+rld=rlog(dds)
+
+countdata=countdata[rowSums(countdata)>0,]
+countdata.rpm = sweep(countdata,2,colSums(countdata)/1000000,FUN="/")
+
+countdata.deseq = sweep(countdata,2,sizeFactors(dds),FUN="/")
+
+labels=paste(colData(airway)[,"cell"],
+ ifelse(colData(airway)[,"dex"]=="trt","T","U"),sep=":")
+oldpar=par(mfrow=c(1,2))
+
+vsd <- varianceStabilizingTransformation(dds)
+
+corr.dist=function(x) { as.dist(1-cor(t(x))) }
+vars=apply(assay(rld),1,var)
+means=apply(assay(rld),1,mean)
+
+# calling gene names
+gene.names = select(org.Hs.eg.db,keys=rownames(assay(rld)),
+ keytype="ENSEMBL",columns=c("ENSEMBL","SYMBOL", "GENENAME"))
+
+gene.names = do.call(rbind, by(gene.names,IND=gene.names[,1],
+ FUN=function(x) { x[1,] } ) )
+all(gene.names[,1]==rownames(assay(rld)))
+
+sort(table(gene.names[,1]),decreasing=T)[1:5]
+# you can check that the “first” factor level in dds$dex 
+# is “trt” (just type dds$dez to see). DESeq will consider 
+# the first level in the factor specified in experimental 
+# design as “reference” and will calculate 
+# expression level changes with respect to it. Here we change
+# the order of the levels, so that “untrt” is the first one and
+# now expression changes will be calculated wrt untreated
+dds$dex = relevel(dds$dex,"untrt")
+# this is all it takes to analyze the dataset! This single 
+# call packs quite sophisticated statistical model under 
+# the hood. NOTE: we have to use raw counts (dds) here, 
+# DESeq will apply all the regularizing transformations and 
+# variance shrinkage internally, as needed. The rlog() 
+# and other functions we used are provided as convenience 
+# add-ons so that we could do our own QC; never give DESeq
+# transformed data for running DE analysis!
+dds1 <- DESeq(dds)
+# dds1
+res <- results(dds1)
+rld1=rlog(dds1)
+head(res)
+# res$ensembl<-row.names(res)
+# res$symbol<-gene.names[,2]
+# res is just a fancied up data frame. Add gene symbol 
+# column using the gene.names table we computed in the notes:
+
+# add needed columns to our results
+res$Symbol<-gene.names[,2]
+res$ensembl<-gene.names[,1]
+res$Genename<-gene.names[,3]
+res<-na.omit(res)
+# order by adjusted p-value and print few most significant
+# diff-expressed genes:
+head(res[order(res$padj),])
+
+# subset values out
+res.p<- res[res$padj<= 0.001,]
+res.pl <-  res.p[abs(res.p$log2FoldChange) >= 1, ]
+# r.genea<-assay(res)[res.pl,]
+# call gene names
+rgene.names = select(org.Hs.eg.db,keys=rownames(res.pl),
+ keytype="ENSEMBL",columns=c("ENSEMBL","SYMBOL", "GENENAME"))
+
+rgene.names = do.call(rbind, by(rgene.names,IND=rgene.names[,1],
+ FUN=function(x) { x[1,] } ) )
+
+all(rgene.names[,1]==rownames(res.pl))
+
+# a
+# creating heatmap
+rld.a<-assay(rld)[rownames(res.pl),]
+rvars=apply(rld.a,1,var)
+
+select=order(rvars,decreasing=T)[1:300]
+heatmap.2(rld.a[select,],trace="none",labCol=labels,ColSideColors=rep(c("green","red"),4), col=redgreen(100),scale="row",labRow=rgene.names[select,2],distfun=corr.dist,margin=c(7,7),key=T)
+
+# b
+
+# create heatmap
+select=order(rvars,decreasing=T)[1:300]
+
+hc=hclust(corr.dist(rld.a[select,]),method="ward.D2")
+plot(hc,lab=F)
+rect.hclust(hc,h=2)
+clusters=cutree(hc,h=2)
+clusters[1:5]
+all(names(clusters)==rgene.names[select,1])
+
+# sort(clusters)
+
+rcol = brewer.pal(10,"Paired")[clusters]
+hc=hclust(corr.dist(rld.a[select,]),method="ward.D2")
+plot(hc,lab=F)
+
+heatmap.2(rld.a[select,],trace="none",labCol=labels,
+ ColSideColors=rep(c("green","red"),4),col=redgreen(100),
+ scale="row",labRow=rgene.names[select,2],distfun=corr.dist,margin=c(7,7),
+ key=T, hclustfun=function(x) { hclust(x,method="ward.D2")},
+ RowSideColors=rcol)
+legend(0.65,12 ,legend=1:5,pch=20,col=brewer.pal(10,"Paired"))
+
+# counts for up and down 
+
+genes.up1 = names(clusters)[clusters==c(1,2)]
+genes.down1 = names(clusters)[ clusters %in% c(3,4,5) ]
+
+
+all.gene.idsa = rownames(rld.a)
+all.genes.upa = factor(as.integer( all.gene.idsa %in% genes.up1 ) )
+names(all.genes.upa) = all.gene.idsa 
+
+
+all.genes.downa = factor(as.integer( all.gene.idsa %in% genes.down1 ) )
+names(all.genes.downa) = all.gene.idsa 
+
+# counts
+agu.df<-data.frame(all.genes.upa)
+agd.df<-data.frame(all.genes.downa)
+df.t<-c(agu.df,agd.df)
+
+
+# percent
+upc<-table(agu.df)
+p.up<-(upc[2]/upc[1])*100
+p.up
+
+downc<-table(agd.df)
+p.down<-(downc[2]/downc[1])*100
+p.down
+
+
+```
+Looking at our heatmap, We can see how separated the genes are from treatment and untreated. It is very interesting to see how much detail we can find within the heatmap and our genes that are clustered. Going off of our genes up and down, It is interesting to see the percentage of treatment that go up with what is given. The percentaged may be low, but it is a good indication there is more information in the data than we realize.
+
+
+
+
+

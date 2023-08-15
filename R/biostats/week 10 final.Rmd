@@ -1,0 +1,463 @@
+---
+title: "Week 10 Final"
+author: "Christopher Tran"
+date: "12/7/2021"
+output: html_document
+---
+
+
+1. ANOVA with categorical variable (20). 
+
+In a hypothetical in vivo study, expression levels of gene UNK in kidney have been measured in rats treated with vehicle (control group) as well as in animals treated with low and high doses of a drug candidate. The levels of the UNK transcript (in arbitrary units) in the animals that survived until the end of the study are shown below. The investigators ran one-way ANOVA on their data (also shown below), and based on the obtained result a conclusion has been drawn about the lack of significant association between the drug dose and expression level of UNK.Please comment on the merit of this finding.
+
+subj.id <- c("01952", "01781", "01745", "01674", 
+ "01937", "01762", "01402", "01938", 
+ "01465", "01471", "01479", "01729", 
+ "01527", "01945", "01071", "01220", 
+ "01506", "01192")
+unk.expr <- c(1.44, 1.03, 2.02, 0.21, 1.49, 5.97, 
+ 2.02, 0.96, 2.49, 1.46, 3.51, 3.68, 
+ 1.52, 0.83, 0.69, 2.41, 0.61, 1.48)
+drug.dose <- c("veh", "low", "high", "veh", "veh", 
+ "veh", "low", "veh", "low", "low", 
+ "high", "high", "veh", "veh", "veh", 
+ "low", "veh", "veh")
+drug.dose <- factor(drug.dose,c("veh","low","high"))
+anova(lm(unk.expr~drug.dose))
+Analysis of Variance Table
+Response: unk.expr
+ Df Sum Sq Mean Sq F value Pr(>F)
+drug.dose 2 5.5443 2.7721 1.5359 0.2473
+Residuals 15 27.0739 1.8049
+
+
+```{r, error=TRUE}
+
+subj.id <- c("01952", "01781", "01745", "01674", "01937", "01762", "01402", "01938", "01465", "01471", "01479", "01729", "01527", "01945", "01071", "01220", "01506", "01192")
+unk.expr <- c(1.44, 1.03, 2.02, 0.21, 1.49, 5.97, 2.02, 0.96, 2.49, 1.46, 3.51, 3.68, 1.52, 0.83, 0.69, 2.41, 0.61, 1.48)
+drug.dose <- c("veh", "low", "high", "veh", "veh", "veh", "low", "veh", "low", "low", "high", "high", "veh", "veh", "veh", "low", "veh", "veh")
+drug.dose <- factor(drug.dose,c("veh","low","high"))
+
+anova(lm(unk.expr~drug.dose))
+
+# additional code
+
+# lm model
+lm(unk.expr~drug.dose)
+
+# summary
+summary(anova(lm(unk.expr~drug.dose)))
+
+# graph
+plot(lm(unk.expr~drug.dose))
+plot(unk.expr~drug.dose)
+```
+Looking at our data the first thing we can know is that our p-value(Pr(>F)) is at a value of 0.2473. The immediate thing we know is that when a p-value is less than 0.05, this means our data is statistically significant to each other. Looking at the other columns given from the anova, we see Df, Sum sq, mean sq, F value, and Pr(>F). The Df in this column means degrees of freedom. The degrees of freedom is typically N(number of samples)- 1. In this instance, we see the degrees of freedom for drug.dose as 2 and residuals as 15. for the sum sq column it shows the sum of squares which is the total variation between group means and overall means. Typically this measures the deviation of data points away from the mean value. The next is mean square, which gives us the mean of squares To obtain this value it is typically the sum sq/df. This generally estimates the variance of the group means around the total mean and also estimates the variation of the errors around the group means, if we calculate the mean square error. The F-value is the two ratio of the mean sq. this gives us a general indication if the null hypthesis is true. the expected F should  be almost close to 1. If this F ratio is larger than the group means, it shows that we expected to see more by chance.  In this case, gene unk is not significant to the drug measured in rats thus we can not take the null hypothesis . Going in a little deeper I pulled the coefficients of the data and also the summary of the anova. The regular lm function gives us the intercept of the linear model for efficiency of the low and high drug dose.This is the expected dosage of when the drug would treat the gene. Now looking at the summary, This gives us the 6 values the minimal, 1st quadrant, median, mean, 3rd quadrant, and max of each value of the category. This is just showing where each value lands if its graphed by a bell curve. 
+
+
+
+2. Linear model on a continuous predictor variable (20).
+
+In a hypothetical experiment studying expression levels of protein kinase XYZ and extent of phosphorylation of its substrates, the following measurements (in arbitrary units) were obtained for these two variables in a number of cell line clones. From the results of ANOVA (shown below), a conclusion has been drawn that there is no significant relationship between levels of XYZ and the extent of phosphorylation of the substrates. Please comment on this finding and on how well it is supported by the data:
+
+clone <- c("CL13", "CL2", "CL21", "CL11", "CL4", "CL9", 
+ "CL3", "CL7", "CL20", "CL19", "CL14", "CL10", 
+ "CL12", "CL15", "CL16", "CL1", "CL6", "CL5", 
+ "CL18", "CL17", "CL8")
+xyz.expr <- c(2.26, 1.65, 2.05, 1.49, 2.6, 1.67, 0.995, 
+ 2.9, 2.91, 2.88, 1.24, 0.913, 1.58, 2.54, 
+ 1.87, 2.62, 2.33, 1.43, 1.82, 1.97, 2.21)
+substr.phosph <- c(1.92, 1.99, 1.89, 1.66, 1.62, 1.85, 
+ 0.85, 1.33, 1.32, 1.22, 1.41, 0.91, 1.64, 
+1.7, 1.94, 1.52, 1.92, 1.74, 1.89, 1.99, 1.98)
+anova(lm(substr.phosph~xyz.expr))
+Analysis of Variance Table
+Response: substr.phosph
+ Df Sum Sq Mean Sq F value Pr(>F)
+xyz.expr 1 0.05883 0.058835 0.4797 0.4969
+Residuals 19 2.33019 0.122642
+
+```{r,error=TRUE }
+
+clone <- c("CL13", "CL2", "CL21", "CL11", "CL4", "CL9", "CL3", "CL7", "CL20", "CL19", "CL14", "CL10", "CL12", "CL15", "CL16", "CL1", "CL6", "CL5", "CL18", "CL17", "CL8")
+xyz.expr <- c(2.26, 1.65, 2.05, 1.49, 2.6, 1.67, 0.995, 2.9, 2.91, 2.88, 1.24, 0.913, 1.58, 2.54, 1.87, 2.62, 2.33, 1.43, 1.82, 1.97, 2.21)
+substr.phosph <- c(1.92, 1.99, 1.89, 1.66, 1.62, 1.85, 0.85, 1.33, 1.32, 1.22, 1.41, 0.91, 1.64, 1.7, 1.94, 1.52, 1.92, 1.74, 1.89, 1.99, 1.98)
+
+
+anova(lm(substr.phosph~xyz.expr))
+
+# additional code
+# anova*clone(no difference)
+anova(lm(substr.phosph~xyz.expr*clone))
+
+# summary of anova
+summary(anova(lm(substr.phosph~xyz.expr)))
+
+# lm of dataset
+lm(substr.phosph~xyz.expr)
+
+# graph
+plot(lm(substr.phosph~xyz.expr))
+plot(substr.phosph~xyz.expr)   
+```
+
+In regards to this dataset, we can judge by looking at the Pr(>F) or pvalue that there is no significance with the protein kinase XYZ and extent of phosphorylation of its substrates. The general rule for p-value to be significant is less than 0.05. Since the value is .4969, this is still above our value which thus tells us that the protein kinanse XYZ and extent of phophorlyation are not significant. Looking at the F value, we see that this value is closer to one and as we know the closer to 1, we can accept the null hypothesis, deeming our results to be significant. In this cause because  the f valuie is 0.4797, there is no significance which we can not accept the null hypothesis. 
+
+3. Outliers and confidence intervals (20).
+
+The first confint() command in the following code calculates 95% confidence intervals for (1) mean days to remission (in ALL dataset) in females, and (2) for offset of the mean days to remission in males w.r.t the mean in females, in accordance with how default design matrix is constructed by lm() in the case of regression on a categorical variable. Then the last command recomputes these confidence intervals after removing putative outlier (patient with the smallest value of days to remission). The output shown below suggests that omitting this putative outlier does not have any effect on the estimated confidence intervals. How is it possible? Please explain the results generated by this code fragment.
+
+ALL.pdat <- pData(ALL)
+date.cr.chr <- as.character(ALL.pdat$date.cr)
+diag.chr <- as.character(ALL.pdat$diagnosis)
+date.cr.t <- strptime(date.cr.chr,"%m/%d/%Y")
+diag.t <- strptime(diag.chr,"%m/%d/%Y")
+ALL.pdat$D2R <- as.numeric(date.cr.t - diag.t)
+confint(lm(D2R~sex,ALL.pdat))
+ 2.5 % 97.5 %
+(Intercept) 62.36467 74.866101
+sexM -11.47458 3.194299
+confint(lm(D2R~sex,ALL.pdat[-which.min(ALL.pdat$D2R)]))
+ 2.5 % 97.5 %
+(Intercept) 62.36467 74.866101
+sexM -11.47458 3.194299
+
+
+```{r,error=TRUE }
+# added code to call library
+library(ALL)
+data(ALL)
+
+# original code
+ALL.pdat <- pData(ALL)
+date.cr.chr <- as.character(ALL.pdat$date.cr)
+diag.chr <- as.character(ALL.pdat$diagnosis)
+date.cr.t <- strptime(date.cr.chr,"%m/%d/%Y")
+diag.t <- strptime(diag.chr,"%m/%d/%Y")
+ALL.pdat$D2R <- as.numeric(date.cr.t - diag.t)
+confint(lm(D2R~sex,ALL.pdat))
+
+confint(lm(D2R~sex,ALL.pdat[-which.min(ALL.pdat$D2R)]))
+
+# additional code
+# no data from this line of code (testing the code)
+ALL.pdat[which.min(ALL.pdat$D2R)]
+
+# finding outliers
+outlier1<-ALL.pdat[which.min(ALL.pdat$D2R),]
+outlier2<-ALL.pdat[which.max(ALL.pdat$D2R),]
+# thought to be a third outlier but this was not correct. Left it in just in case for the line of code
+# outlier3<-ALL.pdat[which.max(outlier2),]
+
+# print out outliers
+outlier1
+outlier2
+# outlier3
+
+# confint dataset of each outlier and original dataset
+confint(lm(D2R~sex,ALL.pdat[-which.min(ALL.pdat$D2R)])
+confint(lm(D2R~sex,ALL.pdat[-which.min(ALL.pdat$D2R),]))
+confint(lm(D2R~sex,ALL.pdat[-c(which.min(ALL.pdat$D2R),which.max(ALL.pdat$D2R)),]))
+# confint(lm(D2R~sex,ALL.pdat[-c(which.min(ALL.pdat$D2R),which.max(ALL.pdat$D2R),which.max(outlier2)),]))
+
+# plot confint dataset of each outlier and original dataset
+plot(confint(lm(D2R~sex,ALL.pdat))) 
+plot(confint(lm(D2R~sex,ALL.pdat[-which.min(ALL.pdat$D2R)])))
+plot(confint(lm(D2R~sex,ALL.pdat[-which.min(ALL.pdat$D2R),])))
+plot(confint(lm(D2R~sex,ALL.pdat[-c(which.min(ALL.pdat$D2R),which.max(ALL.pdat$D2R)),])))
+# plot(confint(lm(D2R~sex,ALL.pdat[-c(which.min(ALL.pdat$D2R),which.max(ALL.pdat$D2R),which.max(outlier2)),])))
+
+# plot dataset of each outlier and original dataset
+plot(D2R~sex,ALL.pdat)
+plot(D2R~sex,ALL.pdat[-which.min(ALL.pdat$D2R)])
+plot(D2R~sex,ALL.pdat[-which.min(ALL.pdat$D2R),])
+plot(D2R~sex,ALL.pdat[-c(which.min(ALL.pdat$D2R),which.max(ALL.pdat$D2R)),])
+# plot(D2R~sex,ALL.pdat[-c(which.min(ALL.pdat$D2R),which.max(ALL.pdat$D2R),which.max(outlier2)),])
+
+# plot each lm model of dataset and outlier
+plot(lm(D2R~sex,ALL.pdat))
+plot(lm(D2R~sex,ALL.pdat[-which.min(ALL.pdat$D2R)]))
+plot(lm(D2R~sex,ALL.pdat[-which.min(ALL.pdat$D2R),]))
+plot(lm(D2R~sex,ALL.pdat[-c(which.min(ALL.pdat$D2R),which.max(ALL.pdat$D2R)),]))
+# plot(lm(D2R~sex,ALL.pdat[-c(which.min(ALL.pdat$D2R),which.max(ALL.pdat$D2R),which.max(outlier2)),]))
+
+
+```
+
+In this data set, I found an error with the coding. The  original code is as follows : confint(lm(D2R~sex,ALL.pdat[-which.min(ALL.pdat$D2R)])). This line is slightly correct in a sense that it is subtrcting the lowest valur of the library data set and is going against days 2 remission to sex. Now when we try and plot this, the values are the same because in this line of code there was one addtional mistake that will definitely change our results. Up above, we disected this code to investigate where the issue lies. Within he Linear model and of both samples, we see that there is no difference as disgusted in the question. Disecting it further, we wanted to see value is being taken out in the ALL.pdat[-which.min(ALL.pdat$D2R)]. Our results show from just that line of code there was an error as the column was not defined. Since the column was not defined, the data to be subtracting that outlier stayed within the data set and there showed no chained. When we change that line of code to ALL.pdat[-which.min(ALL.pdat$D2R),]. This took out the outlier and reduced our values when running the confint. I also wanted to see if we took out the max value in our data set to see anymore significant changes and the results had shown there was changes.  In general, There were two outliers in this dataset.
+
+4. Cross-validation for predictive accuracy (20).
+
+The following code uses cross-validation in order to estimate predictive accuracy for a linear model of days-to-remission as a function of gene expression in ALL dataset. It runs to completion without errors but produces a number of warnings (shown below) about "differing numbers of rows" and "mismatches in object
+lengths." Please explain the source of those warnings and how they can be cleaned up. Please also explain how whatever caused those warnings affects the output (if at all), and how and why (and if) the output changes upon fixing the code. (Hint: in order to observe these warnings you do not have to go through all 12K genes at each step of cross-validation - one percent of that amount is plenty - and it will save you a lot of time you would otherwise waste watching it run; remember also that R is an interpreter, so you can run commands one at a time if you need to and examine their outputs).
+
+library(ALL)
+data(ALL)
+set.seed(1234)
+# calculate days-to-remission:
+ALL.pdat <- pData(ALL)
+date.cr.chr <- as.character(ALL.pdat$date.cr)
+diag.chr <- as.character(ALL.pdat$diagnosis)
+date.cr.t <- strptime(date.cr.chr,"%m/%d/%Y")
+diag.t <- strptime(diag.chr,"%m/%d/%Y")
+ALL.pdat$D2R <- as.numeric(date.cr.t - diag.t)
+# prepare the data structures:
+ALL.exprs <- exprs(ALL)[,!is.na(ALL.pdat$D2R)]
+ALL.pdat <- ALL.pdat[!is.na(ALL.pdat$D2R),]
+n.xval <- 5
+s2.xval <- numeric()
+xval.grps <- sample(1:dim(ALL.pdat)[1]%%n.xval+1)
+# run over each cross-validation:
+for ( i.xval in 1:n.xval ) {
+ min.pval <- 1.0
+ min.id <- NA
+ train.exprs <- ALL.exprs[,xval.grps!=i.xval]
+ train.d2r <- ALL.pdat[xval.grps!=i.xval,"D2R"]
+ # evaluate each gene in the training dataset to find the one
+ # most associated with the outcome:
+ for( i in 1:dim(train.exprs)[1]) {
+ ###for( i in 1:100 ) {
+ p.val <- anova(lm(train.d2r~train.exprs[i,],))[1,"Pr(>F)"]
+ if ( p.val < min.pval ) {
+ min.pval <- p.val
+ min.id <- i
+ }
+ }
+ # print the gene found:
+ cat(rownames(train.exprs)[min.id],min.pval,fill=T)
+ # refit the model for best gene found on training dataset:
+ best.lm.xval <- lm(train.d2r~train.exprs[min.id,])
+ # calculate predictions on test dataset:
+ test.exprs <- ALL.exprs[,xval.grps==i.xval]
+ test.d2r <- ALL.pdat[xval.grps==i.xval,"D2R"]
+ test.pred <- predict(
+ best.lm.xval,data.frame(t(test.exprs),test.d2r)
+ )
+ # accumulate squared errors of prediction:
+ s2.xval <- c(s2.xval,(test.pred-test.d2r)^2)
+}
+40176_at 1.433363e-05
+35296_at 8.721938e-07
+1213_at 3.760985e-06
+34852_g_at 2.161217e-06
+33901_at 1.399374e-06
+Warning messages:
+1: 'newdata' had 19 rows but variables found have 77 rows 
+2: In test.pred - test.d2r :
+ longer object length is not a multiple of shorter object length
+...
+# print average squared error in cross-validation:
+mean(s2.xval)
+[1] 332.7707
+
+```{r,error=TRUE }
+# original code
+library(ALL)
+data(ALL)
+set.seed(1234)
+
+# calculate days-to-remission:
+ALL.pdat <- pData(ALL)
+date.cr.chr <- as.character(ALL.pdat$date.cr)
+diag.chr <- as.character(ALL.pdat$diagnosis)
+date.cr.t <- strptime(date.cr.chr,"%m/%d/%Y")
+diag.t <- strptime(diag.chr,"%m/%d/%Y")
+ALL.pdat$D2R <- as.numeric(date.cr.t - diag.t)
+
+# prepare the data structures:
+ALL.exprs <- exprs(ALL)[,!is.na(ALL.pdat$D2R)]
+ALL.pdat <- ALL.pdat[!is.na(ALL.pdat$D2R),]
+n.xval <- 5
+s2.xval <- numeric()
+xval.grps <- sample(1:dim(ALL.pdat)[1]%%n.xval+1)
+
+# run over each cross-validation:
+for ( i.xval in 1:n.xval ) {
+        min.pval <- 1.0
+        min.id <- NA
+        train.exprs <- ALL.exprs[,xval.grps!=i.xval]
+        train.d2r <- ALL.pdat[xval.grps!=i.xval,"D2R"]
+        # evaluate each gene in the training dataset to find the one
+        # most associated with the outcome:
+        for( i in 1:dim(train.exprs)[1]) {
+                ###for( i in 1:100 ) {
+                p.val <- anova(lm(train.d2r~train.exprs[i,],))[1,"Pr(>F)"]
+                if ( p.val < min.pval ) {
+                        min.pval <- p.val
+                        min.id <- i
+                }
+        }
+        # print the gene found:
+        cat(rownames(train.exprs)[min.id],min.pval,fill=T)
+        # refit the model for best gene found on training dataset:
+        best.lm.xval <- lm(train.d2r~train.exprs[min.id,])
+        # calculate predictions on test dataset:
+        test.exprs <- ALL.exprs[,xval.grps==i.xval]
+        test.d2r <- ALL.pdat[xval.grps==i.xval,"D2R"]
+        test.pred <- predict(
+                best.lm.xval,data.frame(t(test.exprs),test.d2r)
+                )
+        # accumulate squared errors of prediction:
+        s2.xval <- c(s2.xval,(test.pred-test.d2r)^2)
+}
+
+mean(s2.xval)
+
+# additional code
+library(ALL)
+data(ALL)
+library(dplyr)
+set.seed(1234)
+
+# calculate days-to-remission:
+ALL.pdat <- pData(ALL)
+date.cr.chr <- as.character(ALL.pdat$date.cr)
+diag.chr <- as.character(ALL.pdat$diagnosis)
+date.cr.t <- strptime(date.cr.chr,"%m/%d/%Y")
+diag.t <- strptime(diag.chr,"%m/%d/%Y")
+ALL.pdat$D2R <- as.numeric(date.cr.t - diag.t)
+
+# prepare the data structures:
+ALL.exprs <- exprs(ALL)[,!is.na(ALL.pdat$D2R)]
+ALL.pdat <- ALL.pdat[!is.na(ALL.pdat$D2R),]
+n.xval <- 5
+s2.xval <- numeric()
+xval.grps <- sample(1:dim(ALL.pdat)[1]%%n.xval+1)
+
+# run over each cross-validation:
+for ( i.xval in 1:n.xval ) {
+        min.pval <- 1.0
+        min.id <- NA
+        train.exprs <- ALL.exprs[,xval.grps!=i.xval]
+        train.d2r <- ALL.pdat[xval.grps!=i.xval,"D2R"]
+        # evaluate each gene in the training dataset to find the one
+        # most associated with the outcome:
+        for( i in 1:dim(train.exprs)[1]) {
+                ###for( i in 1:100 ) {
+                p.val <- anova(lm(train.d2r~train.exprs[i,],))[1,"Pr(>F)"]
+                if ( p.val < min.pval ) {
+                        min.pval <- p.val
+                        min.id <- i
+                }
+        }
+        # print the gene found:
+        cat(rownames(train.exprs)[min.id],min.pval,fill=T)
+        # refit the model for best gene found on training dataset:
+        best.lm.xval <- lm(train.d2r~train.exprs[min.id,])
+        # best.lm.xval
+        # calculate predictions on test dataset:
+        test.exprs <- ALL.exprs[,xval.grps==i.xval]
+      
+        test.d2r <- ALL.pdat[xval.grps==i.xval,"D2R"]
+        # test.d2r
+        # ALL.pdat
+        test.dft<-data.frame(t(test.exprs))
+        test.dft<-c(test.d2r,test.dft)
+        
+        test.pred <- predict(best.lm.xval,test.dft)
+        # test.pred <-predict(best.lm.xval,data.frame(t(test.exprs),test.d2r))
+        # test.pred
+        # accumulate squared errors of prediction:
+        # test.dft==test.dft
+        s2.xval <- c(s2.xval,(test.pred-length(test.d2r))^2)
+        # s2.xval <- c(s2.xval,(test.pred-test.d2r^2)
+        # s2.xval
+        # s2.xval1
+        # test.d2r
+}
+
+mean(s2.xval,,na.rm=T)
+
+```
+The first part of the code that had the "newdata" error was connected to test.pred <- predict(best.lm.xval,data.frame(t(test.exprs),test.d2r)) line of code. The columns of the dataframe was not aligned which is why the new data error was being called out. I added test,d2r into a list and stored it into a new variable test.dft. This cleared out the error and gave the us no error. Now moving onto the next error we come across 2: In the next line of error,  we havetest.pred - test.d2r :longer object length is not a multiple of shorter object length. This error is found in s2.xval <- c(s2.xval,(test.pred-test.d2r)^2), What i did here was add length to the code. The following code should look like this now  s2.xval<-c(s2.xval,(test.pred-length(test.d2r))^2). This changes the code in giving us another mean value due to the fact it is grabbing the length of test.d2r. This was one way i found to troubleshoot the error.
+
+
+
+
+5. Finding genes associated with outcome in B-ALL (10).
+
+In their paper (it is also posted among Week 10 materials on Latte website),http://bloodjournal.hematologylibrary.org/cgi/content/full/103/7/2771,the authors of the study that produced the ALL dataset describe identification of genes associated with patient response to the treatment, in patients with T-type disease (section "Gene expression profile associated with response to therapy"). This was done by using t-test to contrast samples from patients who achieved complete remission to the ones who were refractory to treatment.Please compare numbers of genes that are significantly associated with response to treatment in patients with T-type disease and in patients with B-type disease and comment on the results obtained. Patients with T-type and B-type diseases can be identified by the status of their 'BT' attribute in patient data - it has to be one of: T,T1,T2,T3,T4 for T-type and one of: B,B1,B2,B3,B4 - for B-type.Response to treatment can be determined from the value of 'CR' attribute inpatient data - it is set to "CR" for patients who achieved complete remission and to "REF" for those who were refractory to treatment. Please describe how the results obtained here might relate to the discussion section in the article.
+
+
+
+
+```{r,error=TRUE }
+# setting variables and calling library
+library(ALL)
+library(qvalue)
+data(ALL)
+ALL.pdat <- pData(ALL)
+bt <- factor(substring(ALL.pdat$BT,1,1))
+date.cr.chr <- as.character(ALL.pdat$date.cr)
+diag.chr <- as.character(ALL.pdat$diagnosis)
+date.cr.t <- strptime(date.cr.chr,"%m/%d/%Y")
+diag.t <- strptime(diag.chr,"%m/%d/%Y")
+days2remiss <- as.numeric(date.cr.t - diag.t)
+x.d2r <- as.numeric(days2remiss)
+ALLBr <- ALL[,which(ALL$BT %in% c("B","B1","B2","B3","B4") & ALL$remission %in% c("CR","REF"))]
+ALLTr <- ALL[,which(ALL.pdat$BT %in% c("T","T1","T2","T3","T4")& ALL$remission %in% c("CR","REF"))]
+fbrem <- factor(ALLBr$remission)
+fb <- factor(ALLBr$BT)
+ftrem <- factor(ALLTr$remission)
+ft <- factor(ALLTr$BT)
+
+
+# calling pval for each gene in with B and T with CR and REF
+bpval <- apply(exprs(ALLBr), 1, function(x) anova(lm(x ~ fb * fbrem))[1,"Pr(>F)"])
+tpval <- apply(exprs(ALLTr), 1, function(x) anova(lm(x ~ ft * ftrem))[1,"Pr(>F)"])
+
+# calling qvalue
+bpq<-qvalue(bpval)$qvalues
+tpq<-qvalue(tpval)$qvalues
+
+# plotting values
+plot(bpval)
+plot(tpval)
+plot(bpq)
+plot(tpq)
+
+
+
+
+```
+Looking at the plots, it looks like with those of T had a better remission than the ones with B. Less values are occurring in The T plot so i am understanding that the T had better treatment and results from what is shown.
+
+
+
+6. Progress to remission in patients with T-ALL and B-ALL (10).
+
+Please compare progressions to remission in B-type and T-type ALL patients using Cox proportional hazards model and also plot them as survival curves using plot(survfit(...)). Please use your best judgement about how to treat patients with refractory disease for the purposes of this analysis.
+
+
+```{r,error=TRUE }
+# set variable and call libraru
+library(ALL)
+library(survival)
+data(ALL)
+ALL.pdat <- pData(ALL)
+bt <- factor(substring(ALL.pdat$BT,1,1))
+
+# days to remission code
+date.cr.chr <- as.character(ALL.pdat$date.cr)
+diag.chr <- as.character(ALL.pdat$diagnosis)
+date.cr.t <- strptime(date.cr.chr,"%m/%d/%Y")
+diag.t <- strptime(diag.chr,"%m/%d/%Y")
+d2r <- as.numeric(date.cr.t - diag.t)
+
+# start the survival analysis:
+# T at positions where d2r has data
+d2r.ind <-as.numeric(!is.na(d2r)) 
+d2r.surv <- Surv(d2r,d2r.ind)
+# plot by BT
+plot(survfit(d2r.surv~bt,data=pData(ALL)),col=c(2,4),xlab="Days",ylab="1-p(remission)")
+legend(100,0.8,legend=c('B','T'),lwd=1,col=c('blue','red'))
+
+# coxph
+coxph(Surv(d2r,as.numeric(!is.na(d2r)))~bt, data=pData(ALL))
+```
+
+I separated the BT values and ran the surv against BT.The results are given from the coxph, butin general from the graph, I think this is how it is suppose to look when using the survival to compare B and T values against remission which makes sense. it seems that we would want to treat the early as we could to provide the right amount of treatment since the early stages seems to be effective. As we move further, the numbers go down and it is not as effective as it should be.
+
+
+
+

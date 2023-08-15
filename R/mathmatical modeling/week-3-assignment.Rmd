@@ -1,0 +1,269 @@
+---
+title: "Week 3 Assignment"
+author: "Christopher Tran"
+date: "1/5/2022"
+output:
+  html_document: default
+  word_document: default
+  pdf_document: default
+---
+1. (25) Let us study how the ratio of within-cluster variance to the total variance changes as function of the number of clusters and the number of variables in the problem. We will be clustering a dataset without any internal structure, so in a sense the numbers we obtain will serve as the expected values under the “null hypothesis” (of having no clusters at all). Any value significantly smaller than one obtained under the null would indicate that at least some structure does exist. Note that this is a learning exercise, not a practical method. The clustering problem is too complex and has too many factors to account for. If we are using a null with Gaussian distribution of all the p variables and obtain a much better within/total variance ratio in real dataset as compared to that null, we can only say that at least we are not clustering a Gaussian cloud. But what if it is not Gaussian, but still has no clusters?
+
+a. Reuse and modify the code from the Notes in order to compute within/total variance ratio in K means clustering of a Gaussian “cloud” in a p=2,3, 10, 100, 500, and 1000-dimensional spaces (space dimensionality=the number of variables). Simulate ~100 observations and repeat M~20-100 times at each p. For each p calculate the mean and sd across the M repeats, and plot those means and sds as function of p (log scale on x axis might prove useful). Do this for K=2 clusters.
+
+b. Same as (a), but this time use p=3 and find the dependence on the number of clusters K: simulate dataset of size ~100 in 3 dimensions, perform clustering with K=2, repeat ~20 times and calculate mean and sd of the within/total variance ratio. Repeat for K = 3, 4, …, 10. Plot obtained means and sds of the mean/total variance ratios as the function of K.
+
+```{r, error=TRUE}
+
+# a
+# callling library, setting variables and vector
+library(rgl)
+f.t<-vector()
+mean.ft<-vector()
+sd.ft<-vector()
+N=c(2,3,10,100,500,1000)
+# loop within matrix to find mean and sd
+for ( p in N) {
+  for ( m in 1:20) {
+  my.data = matrix(rnorm(100*p),ncol=p)
+  f=kmeans(my.data,2)
+  # f.t[,m]=f$tot.withinss/f$totss
+  f.t[m]<-f$tot.withinss/f$totss
+  }
+  mean.ft[p]<-mean(f.t)
+  sd.ft[p]<-sd(f.t)
+}
+
+# plot graph
+plot(mean.ft,sd.ft)
+
+
+# b
+# setting vector and variable
+f.t1<-vector()
+f.t2<-vector()
+f.t3<-vector()
+f.t4<-vector()
+f.t5<-vector()
+f.t6<-vector()
+f.t7<-vector()
+f.t8<-vector()
+f.t9<-vector()
+
+sdf.t1<-vector()
+mf.t1<-vector()
+sdf.t2<-vector()
+mf.t2<-vector()
+sdf.t3<-vector()
+mf.t3<-vector()
+sdf.t4<-vector()
+mf.t4<-vector()
+sdf.t5<-vector()
+mf.t5<-vector()
+sdf.t6<-vector()
+mf.t6<-vector()
+sdf.t7<-vector()
+mf.t7<-vector()
+sdf.t8<-vector()
+mf.t8<-vector()
+sdf.t9<-vector()
+mf.t9<-vector()
+
+N2=3
+# loop wiht matrix for k cluster, mean, and sd
+for ( p2 in N2) {
+  for ( m2 in 1:20) {
+  my.data = matrix(rnorm(100*p2),ncol=p2)
+  f1=kmeans(my.data,2)
+  f2=kmeans(my.data,3)
+  f3=kmeans(my.data,4)
+  f4=kmeans(my.data,5)
+  f5=kmeans(my.data,6)
+  f6=kmeans(my.data,7)
+  f7=kmeans(my.data,8)
+  f8=kmeans(my.data,9)
+  f9=kmeans(my.data,10)
+  # f.t[,m]=f$tot.withinss/f$totss
+  f.t1[m2]<-f1$tot.withinss/f1$totss
+  f.t2[m2]<-f2$tot.withinss/f2$totss
+  f.t3[m2]<-f3$tot.withinss/f3$totss
+  f.t4[m2]<-f4$tot.withinss/f4$totss
+  f.t5[m2]<-f5$tot.withinss/f5$totss
+  f.t6[m2]<-f6$tot.withinss/f6$totss
+  f.t7[m2]<-f7$tot.withinss/f7$totss
+  f.t8[m2]<-f8$tot.withinss/f8$totss
+  f.t9[m2]<-f9$tot.withinss/f9$totss
+  }
+  sdf.t1[p2]<-sd(f.t1)
+  mf.t1[p2]<-mean(f.t1)
+  sdf.t2[p2]<-sd(f.t2)
+  mf.t2[p2]<-mean(f.t2)
+  sdf.t3[p2]<-sd(f.t3)
+  mf.t3[p2]<-mean(f.t3)
+  sdf.t4[p2]<-sd(f.t4)
+  mf.t4[p2]<-mean(f.t4)
+  sdf.t5[p2]<-sd(f.t5)
+  mf.t5[p2]<-mean(f.t5)
+  sdf.t6[p2]<-sd(f.t6)
+  mf.t6[p2]<-mean(f.t6)
+  sdf.t7[p2]<-sd(f.t7)
+  mf.t7[p2]<-mean(f.t7)
+  sdf.t8[p2]<-sd(f.t8)
+  mf.t8[p2]<-mean(f.t8)
+  sdf.t9[p2]<-sd(f.t9)
+  mf.t9[p2]<-mean(f.t9)
+}
+
+# plot 
+plot(c(sdf.t1,sdf.t2,sdf.t3,sdf.t4,sdf.t5,sdf.t6,sdf.t7,sdf.t8,sdf.t9),c(mf.t1,mf.t2,mf.t3,mf.t4,mf.t5,mf.t6,mf.t7,mf.t8,mf.t9))
+
+```
+
+2. (25) Let us implement hierarchical clustering with correlation-based distance. The dist() function does not offer correlation as one of the options. Instead, we will:
+
+a. Calculate correlation manually; use the cor() function to calculate matrix of pairwise correlations between the log transformed samples in the tissue profiling dataset (note: cor() calculates correlations between the columns of its argument). Do not forget that the correlation-based distance is 1-cor.
+
+b. The matrix of pairwise correlation-based distances must be converted into the distance object; use as.dist() function for this purpose.
+
+c. Now that we have a distance object, we can call hclust() on that object. Use Ward clustering method (but you are encouraged to experiment with other linkages). 
+
+d. Plot the clustering dendrogram and comment on the results. Which samples cluster together? Does it make sense? Is the clustering consistent with other choices of similarity measure and with the PCA?
+
+```{r,error=TRUE}
+# load data
+load("wang_eset_notrunc.Rdata")
+# set varables
+# wang.eset<- load("wang_eset_notrunc.Rdata")
+ex=exprs(wang.eset)
+ex[1:3]
+pd=pData(wang.eset)
+pd[1:3]
+# a
+exo<-cov(ex)
+cex<-cor(ex)
+
+# b
+ex.rpm = sweep(ex,MARGIN=2,colSums(exo)/1000000,FUN="/")
+ex.rpmc = sweep(ex,MARGIN=2,colSums(cex)/1000000,FUN="/")
+
+# c and d
+# create dendrogram
+d = dist(t(ex.rpm))
+d.log = dist(t(log2(ex.rpm+1)))
+hclust(d,method="average")
+oldpar=par(mfrow=c(2,2))
+plot(hclust(d,method="average"),label=pData(wang.eset)[,2],main="Averag
+e, count")
+plot(hclust(d,method="ward.D2"),label=pData(wang.eset)[,2], main="Ward, 
+count")
+plot(hclust(d.log,method="average"),label=pData(wang.eset)[,2],main="Av
+erage, log-count")
+plot(hclust(d.log,method="ward.D2"),label=pData(wang.eset)[,2],main="Wa
+rd, log-count")
+par(oldpar)
+
+
+d2 = dist(t(cex))
+d2.log = dist(t(log2(ex.rpmc+1)))
+hclust(d2,method="average")
+oldpar=par(mfrow=c(2,2))
+plot(hclust(d2,method="average"),label=pData(wang.eset)[,2],main="Averag
+e, count")
+plot(hclust(d2,method="ward.D2"),label=pData(wang.eset)[,2], main="Ward, 
+count")
+plot(hclust(d2.log,method="average"),label=pData(wang.eset)[,2],main="Av
+erage, log-count")
+plot(hclust(d2.log,method="ward.D2"),label=pData(wang.eset)[,2],main="Wa
+rd, log-count")
+par(oldpar)
+
+```
+I think looking at this it makes sense in terms of what clusters near each other. We can generally see which sample is close to what and is consistant with the PCA.Looking at different methods, this provides the information for the upcoming PCA in terms of clustering.
+
+
+3. (50) For this problem we will be looking at a completely new dataset! Download NCI60.rda file from http://www.bioinf.ucd.ie/people/aedin/R/full_datasets/. This dataset is available from many sources (including supplementary materials for the ISLR book), but keep in mind that the data may be packaged slightly differently in different distributions. It is assumed in the following instructions that the data are downloaded from the URL shown above. This dataset comes from NCI and contains expression data for 60 cancer cell lines. These are old data, and the expression levels were measured using microarray technology. It could be very instructive to see that expression is expression is expression, whether it is new technology or old: post-processing analysis methods are the same. 
+
+a. .rda is an "R data file" format. Make sure the downloaded file is in your working directory and import data into the session with the load() command.
+
+b. NCI60 variable will appear in your workspace. Examine its content. You will find out that it is a simple list. The content is equivalent to the data structures we have been working with: the list element "Affy" contains a table of expression levels (rows=genes, columns=cell lines, i.e. samples), and list element "classes" contains "phenotypic data" (first column=sample name, second column=tissue of origin of the cell line). Strictly speaking, the Affy table contains log-differential expression levels, i.e. logarithm of the ratio of the expression level of a gene to the expression level of the same gene in a control sample, however this does not change much in what we are going to do.
+
+c. Let us create a vector of colors such that each tissue of origin has its own unique color. Here's the code you can use (examine intermediate results as needed in order to understand how this works):
+
+# extract tissue of origin for each sample:
+classes=NCI60$classes[,2] 
+# reserve one color per each unique tissue: 
+cols=rainbow(length(unique(classes)))
+# a bit involved... as.factor() will turn vector of
+# tissue names into a factor variable, as.numeric()
+# will turn the factor into the number-based
+# representation: all instances of one level of the
+# factor will be represented as 1, all instances of
+# another as 2, etc; we use that vector as index into
+# the vector of unique colors:
+point.cols=cols[ as.numeric( as.factor(classes) ) ]
+
+d. Run PCA with samples as observations (i.e. genes=variables) on the whole dataset. Generate 2D plots for PC1-PC2, PC2-PC3 and PC1-PC3 projections, as well as 3D scatterplot. Use the vector of colors point.cols (as shown above) to give each point (cell line) the color representing its tissue of origin. Comment on your results: is there any structure/grouping in the PCA projections? Even if there is none, i.e. if different tissues of origin overlap and there is no clear separation, can we still tell that cell lines from the same tissue tend to group together?
+
+e. Repeat d) on genes with largest variation. The full dataset has to many variables (genes), some of them exhibit some meaningful variation from sample to sample and could help discriminate one from the other, others exhibit just random fluctuations. If there are too many variables that bring nothing but noise, we might start fitting them (especially after scaling) instead of the signal. Calculate the variance of each gene's expression levels across all samples: use apply() in order to apply var() to each row of the Affy table, save results in a vector, say V. Now perform PCA and generate plots (with colored points), just like in part (d) above, but using only subset of genes with V>1. Comment on the results. Do data segregate into separate clusters in PCA projection and if yes, what are those clusters? Beyond clustering, is there any trend (i.e. different tissues do not separate well, but are same tissues still somewhat grouped together?
+
+```{r,error=TRUE}
+library(dplyr)
+library(rgl)
+# a + b
+# load library
+load("NCI60.rda")
+
+# extract tissue of origin for each sample:
+classes=NCI60$classes[,2] 
+ross=NCI60$Ross[,2]
+affy=NCI60$Affy
+t.affy<-t(affy)
+# reserve one color per each unique tissue: 
+cols=rainbow(length(unique(classes)))
+# a bit involved... as.factor() will turn vector of
+# tissue names into a factor variable, as.numeric()
+# will turn the factor into the number-based
+# representation: all instances of one level of the
+# factor will be represented as 1, all instances of
+# another as 2, etc; we use that vector as index into
+# the vector of unique colors:
+point.cols=cols[ as.numeric( as.factor(classes) ) ]
+
+# c
+Cols=function (x){
+ cols=rainbow (length(unique(x)))
+ return(cols[as.numeric (as.factor(x))])
+}
+
+# d
+pca = prcomp(t.affy,scale=T)
+pca$x[1:3,]
+pca$rotation[1:3,]
+
+plot(pca$x[,1:2],col=Cols(t.affy),pch=20,cex=1.5)
+
+plot(pca$x[,2:3],col=Cols(t.affy),pch=20,cex=1.5)
+plot(pca$x[,1:3],col=Cols(t.affy),pch=20,cex=1.5)
+plot(pca,col=Cols(t.affy))
+
+plot3d(pca$x[,1:2],pca$x[,2:3],pca$x[,1:3],col=Cols(t.affy))
+
+
+# e
+v.affy<-apply(affy,1,var)
+v.affy1<-affy[v.affy>1,]
+vpca<-prcomp(t(v.affy1),scale=T)
+vpca$x[1:3,]
+vpca$rotation[1:3,]
+
+plot(vpca$x[,1:2],col=Cols(t.affy),pch=20,cex=1.5)
+plot(vpca$x[,2:3],col=Cols(t.affy),pch=20,cex=1.5)
+plot(vpca$x[,1:3],col=Cols(t.affy),pch=20,cex=1.5)
+plot(vpca,col=Cols(t.affy))
+plot3d(vpca$x[,1:2],vpca$x[,2:3],vpca$x[,1:3],col=Cols(t.affy))
+
+
+         
+```
+Looking at these graphs and comparing the V>1 to the original, the clusters segregated. With the variance greater than one, the clusters look to clear up more towards -15 to 15. The original data had a range from -20 to 60. There seems to be samples of breast, NSCLC, leukemia, colon, and ovarian. THe trends look to be grouped together with their respected groups.
+

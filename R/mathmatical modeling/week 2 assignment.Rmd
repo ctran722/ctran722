@@ -1,0 +1,256 @@
+---
+title: "Week 2 assignment"
+author: "Christopher Tran"
+date: "1/5/2022"
+output: html_document
+---
+1. (30) Loading the data and generating the plate plot.
+
+a. Locate the data directory "apoptosis" under the directory "extdata" in the facsDorit package installation folder (use R command to do the job programmatically if you can, see the Notes).
+
+b. Load the cytoset (the index file is called plateIndex.txt, same as in the mapk data).
+
+c. Do a simple QC: generate a plate plot for the number of cells in each well. Note that the code from the Notes will not work as is, since in this experiment some wells on the plate were left unused. As the result, the vector of the cell counts will be originally shorter than 96. We need to fix that. way to make plotPlate() work is to insert NAs, at the correct positions, into the vector of values to be plotted. The other way is to additionally provide the vector of indexes, which specify what wells the data values correspond to (for instance, if you have vector of just 3 values c(100,237,613) and the vector of indexes c(1,2,96), the three values will be assigned to (and plotted as) wells A01, A02, and H12 -- as the wells are numbered in the order A1, A2, A3, ... , H10, H11, H12. It does not matter which solution for fixing the data you come up with as long as you end up with the correct vector(s). Here is one suggestion: if you used csApply() to compute the cell numbers, just like we did in the Notes, take a look at the names of the elements of that vector (they look like "test2933T3.A01". If you look carefully enough, you will notice that (a) some wells are indeed missing, (b) the names of the wells all follow the format "test2933T3.XDD" where X is a letter (A-H) and DD is a two-digit number (01-12). Thus, you can easily generate the vector N of the names of all wells on the plate. Now if you simply index your vector of the cell counts with N (as in ncells[N]), you will get: a vector of length 96 (because that's the length of the vector we are indexing with); cell counts of existing wells will be inserted at the right positions (because ncells has named elements, so where the index N matches such name, the value will be retrieved); for the missing cells the cell count will be set to NA (because when we try indexing a vector with a value that's not among the vector's element names, we simply get NA). Try it and make sure you get what you expect. Now you can use such fixed vector of cell counts (with NA inserted) as the argument to plotPlate(). Alternatively, you can match() the names of the elements in the cell count vector to the full-length vector of 96 well names; you will get a vector of indices that you can use as the second argument to plotPlate() as described above (see the docs).
+
+```{r, error=TRUE}
+# library(facsDorit)
+
+library(flowCore)
+library(platetools)
+library(flowViz)
+library(ggplot2)
+library(flowStats)
+
+# a
+sampleDir <- system.file("extdata", "apoptosis", package = "facsDorit")
+# example given within map data
+files <- list.files(sampleDir)
+files2 <- files[2:length(files)]
+files3 <- files[1:(length(files)-1)]
+file.location <- paste(sampleDir, files2, sep = "/")
+file.location2<-paste(sampleDir, files3, sep = "/")
+apoptosis <- read.flowSet(file.location)
+apoptosis
+
+# b
+sampleDir <- system.file("extdata", "map", package = "facsDorit")
+files <- list.files(sampleDir)
+files2 <- files[1:(length(files)-1)]
+file.location <- paste(sampleDir, files2, sep = "/")
+map <- read.flowSet(file.location)
+map
+
+
+
+# same error message with index
+# map.a <- read.flowSet(file.location2,phenoData = "plateIndex.txt")
+# map.ab<- read.flowSet(file.location2)
+# map.a
+# map.ab
+
+
+# c
+# plotting plate
+Ncells = fsApply(apoptosis,nrow)
+Ncells[1:3]
+
+vals<-c("N/A","N/A","N/A")
+well<-c("H10","H11","H12")
+plate_id<-c("My Plate","My Plate","My Plate")
+df2<-data.frame(vals,well,plate_id)
+df.m<-data.frame(vals)
+N<-nrow(Ncells)
+
+rownames(df2)<-c("test2933T3.D10","test2933T3.D11","test2933T3.D12")
+rownames(df.m)<-c("test2933T3.D10","test2933T3.D11","test2933T3.D12")
+
+
+
+df.1<-data.frame(vals=cbind(Ncells[1:45,]))
+df.2<-data.frame(vals=Ncells[46:93,])
+df.t<-rbind(df.1,df.m,df.2)
+well = num_to_well(1:nrow(df.t), plate = 96)
+plate_id = rep(c("My Plate"), each = nrow(df.t))
+df.t$well<-well
+df.t$plate_id<-plate_id
+df.t$vals<-as.numeric(df.t$vals)
+
+
+df <- data.frame(vals = Ncells,well = num_to_well(1:N, plate = 96),plate_id = rep(c("My Plate"), each = N))
+# df <- data.frame(vals = c(ncells[1:45],V1,ncells[46:93]),well = num_to_well(1:96, plate = 96),plate_id = rep(c("My Plate"), each = 96))
+
+df<-rbind(df,df2)
+df$vals<-as.numeric(df$vals)
+
+a.plate<-z_grid(data = df$vals,well = df$well,plate_id = df$plate_id) + ggtitle("Apoptosis Test")
+a.plate
+
+a.plate2<-z_grid(data = df.t$vals,well = df.t$well,plate_id = df.t$plate_id) + ggtitle("Apoptosis Test")
+a.plate2
+
+```
+
+
+I had issues with creating the cytoset for the index plate. After creating the Data plate for the QC. THe plate was nice and easy to see along with collecting the data.The darker colors make it easy to read considering where the values are.When adding the N/A value in, it is nice to see that those wells are greyed out to indicated there is nothing within the well.
+
+2. (30) Scatterplots
+
+a. Generate FSC-SSC scatterplot for the very first well in the dataset.
+
+b. Try finding the main cell population by using a fit with a single 2-D normal distribution (as shown in the Notes). Use few scale factors, e.g. 1, 1.5, 2. Plot the results and comment on your findings. Does this simple gating procedure seem to be working well in this case? Would you trust it?
+
+
+```{r,error=TRUE}
+# calling libraries
+library(flowStats)
+library(flowViz)
+# express data to prepare for plot
+a.well = apoptosis[[1]]
+a.well
+well.data = exprs(a.well)
+well.data[1:2,]
+
+# a
+# plot well.data
+x<- well.data[,c("FSC-H", "SSC-H")]
+plot(x, pch = 20, col = densCols(x))
+
+# b
+# filter data and put to scale
+n2Filter <- norm2Filter("SSC-H", "FSC-H", scale=1, filterId="Selected_Cells")
+n2Filter.results <- filter(apoptosis, n2Filter)
+xyplot(`SSC-H` ~ `FSC-H`, data=apoptosis[1:2,], filter=n2Filter.results)
+
+n2Filter1 <- norm2Filter("SSC-H", "FSC-H", scale=1.5, filterId="Selected_Cells")
+n2Filter1.results <- filter(apoptosis, n2Filter1)
+xyplot(`SSC-H` ~ `FSC-H`, data=apoptosis[1:2,], filter=n2Filter1.results)
+
+
+n2Filter2 <- norm2Filter("SSC-H", "FSC-H", scale=2, filterId="Selected_Cells")
+n2Filter2.results <- filter(apoptosis, n2Filter2)
+xyplot(`SSC-H` ~ `FSC-H`, data=apoptosis[1:2,], filter=n2Filter2.results)
+
+```
+
+
+
+Looking through each plot, the fitting can be trusted in my opinion. The normal plot is showing the majority of the data. Once the filter fits the data, it centralizes it. The scaling is actually helpful since this can change in regards to how big you need the scale to be. This helps with how much data you want to see in regards to the center of your data.
+
+3. (40) In the apoptosis experiment we are looking at, the "treatments" were expression vectors. In other words, a specific expression vector was added to each well (except for mock control of course), in the expectation that the vector would be taken up by the cells, and thus the protein encoded on the vector would become overexpressed. The transfection efficiency is never 100% though and in fact in can be pretty low. In order to monitor that efficiency, the expression vectors encoded not native proteins, but fusion chimeras: a native functional protein with a fluorescent protein YFP attached at either C- or N-end (both C- and N- versions were used in, in two sepearate wells, to improve the accuracy of the experiment). Now, if the vector does get transfected into the cell and the gene it encodes is expressed, we should see the fluorescence from the YFP protein portion. This fluorescence was registered in the FL1-H channel. If the functional protein portion of the expressed protein initiates apoptosis, then we should see activation of Caspase-3, the main effector of apoptosis. Thus the fluorescent antibody against activated form of Caspase-3 was employed and monitored in the channel FL4-H.
+
+a. look at the plate index (pData()). As you can see, the very first well is mock control, i.e. cells were transfected with an empty vector carrying no protein-coding gene. Generate the scatterplot in FL1-H/FL4-H coordinates for that well. Also plot separately the histograms of FL1-H (YFP) and FL4-H (activated caspase) channels. Can you explain the observations?
+
+b. For both channels (FL1-H and FL4-H) calculate, quite naively, threshold values T1, T4 as T = mean(intensity)+2*sd(intensity)
+
+c. Re-plot again the FL1-H/FL4-H scatterplot, and add to it the thresholds we just detected as straight lines (i.e. T1 is the threshold in the FL1-H 
+channel, so we plot it as a vertical line). Your plot is now split into four areas. Bottom-left is what we will call "no YFP, no activity" - that's where most of the cells of the mock control lie, and we don't expect either YFP or elevated caspase activity there. Top-right is the most interesting area: the cells in that area express YFP and exhibit activated caspase signal at the same time, both 2 standard deviations above the mean observed in the mock control. 
+
+d. Plot the FL1-H/FL4-H scatterplot for the well 6 (CIDE protein with YFP at the N-terminal, CIDE-Y). Plot the thresholds as horizontal and vertical lines. CIDE is a known activator of apoptosis. What do you observe? Calculate the percentage of the transfected and caspaseinduced cells ( > T1 and > T4) with respect to the trasfected cells (>T1). Can you explain the number? (Hint: we are looking at far tails, where it's definitely "not like the control"; the distributions can in fact overlap)
+
+```{r , error=TRUE}
+# calling p data and preparing to plot data.
+pData(apoptosis)[1:4]
+
+a.well = apoptosis[[1]]
+a.well
+well.data = exprs(a.well)
+well.data[1:2,]
+# a
+# creating plot and histogram
+
+x1<- well.data[,c("FL1-H", "FL4-H")]
+plot(x1, pch = 20, col = densCols(x1))
+hist(x1)
+
+x2<- well.data[,"FL1-H"]
+plot(x2, pch = 20, col = densCols(x2))
+hist(x2)
+
+x3<- well.data[, "FL4-H"]
+plot(x3, pch = 20, col = densCols(x3))
+hist(x3)
+
+
+# b
+# calculating threshold
+
+int<-data.frame(cbind(x1))
+
+T1<-mean(int$FL1.H)+2*sd(int$FL1.H)
+T1
+T4<-mean(int$FL4.H)+2*sd(int$FL4.H)
+T4
+
+# c
+# creating threshold line for each plot
+x1<- well.data[,c("FL1-H", "FL4-H")]
+plot(x1, pch = 20, col = densCols(x1))
+abline(v = T1, h= T4, col = c("red", "blue"),lty = c(1, 2), lwd = c(1, 3))
+hist(x1)
+abline(v = T1, h= T4, col = c("red", "blue"),lty = c(1, 2), lwd = c(1, 3))
+
+x2<- well.data[,"FL1-H"]
+plot(x2, pch = 20, col = densCols(x2))
+abline(v = T1, h= T4, col = c("red", "blue"),lty = c(1, 2), lwd = c(1, 3))
+hist(x2)
+abline(v = T1, h= T4, col = c("red", "blue"),lty = c(1, 2), lwd = c(1, 3))
+
+
+x3<- well.data[, "FL4-H"]
+plot(x3, pch = 20, col = densCols(x3))
+abline(v = T1, h= T4, col = c("red", "blue"),lty = c(1, 2), lwd = c(1, 3))
+hist(x3)
+abline(v = T1, h= T4, col = c("red", "blue"),lty = c(1, 2), lwd = c(1, 3))
+
+# d
+# creating threshold line for vertical and horizontal regions
+x1<- well.data[,c("FL1-H", "FL4-H")]
+plot(x1, pch = 20, col = densCols(x1))
+abline(v = c(T1,T4), h= c(T1,T4), col = c("red", "blue"),lty = c(1, 2), lwd = c(1, 3))
+hist(x1)
+abline(v = c(T1,T4), h= c(T1,T4), col = c("red", "blue"),lty = c(1, 2), lwd = c(1, 3))
+
+x2<- well.data[,"FL1-H"]
+plot(x2, pch = 20, col = densCols(x2))
+abline(v = c(T1,T4), h= c(T1,T4), col = c("red", "blue"),lty = c(1, 2), lwd = c(1, 3))
+hist(x2)
+abline(v = c(T1,T4), h= c(T1,T4), col = c("red", "blue"),lty = c(1, 2), lwd = c(1, 3))
+
+x3<- well.data[, "FL4-H"]
+plot(x3, pch = 20, col = densCols(x3))
+abline(v = c(T1,T4), h= c(T1,T4), col = c("red", "blue"),lty = c(1, 2), lwd = c(1, 3))
+hist(x3)
+abline(v = c(T1,T4), h= c(T1,T4), col = c("red", "blue"),lty = c(1, 2), lwd = c(1, 3))
+
+#calculating percentage 
+head(int$FL1.H > T1)[1:4]
+head(int$FL4.H > T4)[1:4]
+t1v<-numeric
+t4v<-numeric
+
+
+for (i in int$FL1.H){
+  if(i>T1){
+   t1v<-c(int$FL1.H)
+  }
+}
+
+
+for (i in int$FL4.H){
+  if(i>T4){
+   t4v<-c(int$FL4.H)
+  }
+}
+
+
+df.p<-data.frame(t1v,t4v)
+t1.p<- sum(df.p$t1v)/(sum(df.p$t1v)+sum(df.p$t4v))
+t1.p
+t4.p<- sum(df.p$t4v)/(sum(df.p$t1v)+sum(df.p$t4v))
+t4.p
+ifelse(int$FL1.H>T1,"yes","no")[1:4]
+
+
+```
+Looking at the percentages, I think these numbers make sense. The percentage of T1 is low so it makes sense that the value is about 4%. Looking through the data frame it had shown that. Not only that, the values that was given in the if else command shows that the majority of the values were not over.
+

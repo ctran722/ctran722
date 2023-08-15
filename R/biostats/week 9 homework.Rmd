@@ -1,0 +1,347 @@
+---
+title: "week 9 homework"
+author: "Christopher Tran"
+date: "12/1/2021"
+output:
+  html_document: default
+  pdf_document: default
+---
+ (25) Run PCA on a simulated three dimensional dataset (three variables) with built-in structure. Use the following data or simulate your own dataset along these lines:
+
+n <- 100
+cntr.dist <- 4
+x <- c(rnorm(n, cntr.dist), rnorm(n, -cntr.dist), rnorm(n, cntr.dist))
+y <- c(rnorm(n, cntr.dist), rnorm(n, -cntr.dist), rnorm(n, 0))
+z <- c(rnorm(n, cntr.dist), rnorm(n, -cntr.dist), rnorm(n, 0))
+
+Try visualizing the original data with scatterplot3d. Run PCA on the data, present results in the form of figures (principal component plot, histogram plot of variances along the principal components), parameters of PCA transformation and written description.
+
+```{r, error=TRUE}
+# calling library
+library(scatterplot3d)
+
+# setting variables
+n <- 100
+cntr.dist <- 4
+x <- c(rnorm(n, cntr.dist), rnorm(n, -cntr.dist), rnorm(n, cntr.dist))
+y <- c(rnorm(n, cntr.dist), rnorm(n, -cntr.dist), rnorm(n, 0))
+z <- c(rnorm(n, cntr.dist), rnorm(n, -cntr.dist), rnorm(n, 0))
+
+# creating scatterplot 3d of variables
+scatterplot3d(x,y,z)
+
+#correlation and covariance of x,y,z 
+cov(x,y); cor(x,y)
+cov(x,z); cor(x,z)
+
+# dataframe variable
+df<- data.frame(x=x,y=y,z=z)
+
+# principal component analysis variable
+px<-prcomp(df,retx=TRUE,scale=TRUE) # run PCA with auto-scaling
+
+# values of PCA variable
+px
+px$x[1:3,]
+
+# rotation of PCA
+lx <- px$rotation
+lx
+
+px$x[1:5,]
+
+x[1]*(-0.5600871)+y[1]*(-0.8284177)+z[1]*(-0.005152389)
+x[1]*(-0.5859524)+y[1]*(0.3917462)+z[1]*(0.709362195)
+x[1]*(-0.5856298)+y[1]*(0.4003237)+z[1]*(-0.704825318)
+
+# plots of graphs
+scatterplot3d(x,y,z)
+scatterplot3d(px$x)
+hist(px$x)
+
+
+```
+
+Looking through the data, we are given a ton of values from the PCA. The PCA provides the standard deviation of the principal component. We can acquire this by pulling the sdev column. We can also get our rotation value from the rotation column. The x values are the true values after PCA has rotated our values. We can see that once its rotated, the 3 clusters are combinded to 2 and the histogram clusters the value at around the 2 value on the the graph. 
+
+
+2. (25) Run PCA on patients (variables=genes) in ALL dataset, using a) top 100, b)top 1000 genes with highest variance as well as c) all genes in ALL. Look at ‘sdev’ component of the object returned by PCA (as in px$sdev) – it lists the variances along each of the principal components. Find the number of first principal components accounting for most variance in the data, e.g. 50% or 75% (total variance is the sum of variances along all PCs; sum of variances of k first principal components is the part they “account” for). Describe how much this number of dimensions explaining most of the variance in the data changes for different number of genes considered. Examine structure in the data as revealed by visualizing in PC projection. Color points (patients) in a scatterplot according to B/T disease types, describe your findings.
+
+
+```{r, error=TRUE}
+# calling library and dataset
+library(ALL)
+library(dplyr)
+library(ggplot2)
+data(ALL)
+
+# setting variables
+samples<-exprs(ALL)
+df.samples<-data.frame(exprs(ALL))
+t100<-df.samples %>% top_n(100)  # highest 100 values
+t1000<-df.samples %>% top_n(1000)  # highest 1000 values
+
+# setting varibales for PCA
+px.all<-prcomp(df.samples,retx=TRUE,scale=TRUE)
+px.100<-prcomp(t100,retx=TRUE,scale=TRUE)
+px.1000<-prcomp(t1000,retx=TRUE,scale=TRUE)
+
+# calling sdev 
+px.all$sdev
+px.100$sdev
+px.1000$sdev
+
+# calling first 3 row of rotated x values
+px.all$x[1:3,]
+px.100$x[1:3,]
+px.1000$x[1:3,]
+
+# calling rotations from PCA
+lx.all <- px.all$rotation
+lx.100 <- px.100$rotation
+lx.1000 <- px.1000$rotation
+
+lx.all
+lx.100
+lx.1000
+
+# applying sd on genes and finding top 100 and 1000 values
+sd.df<-apply(df.samples,1,sd)
+sd.df<-data.frame(sd.df)
+sdf100<-sd.df%>% top_n(100)
+sdf1000<-sd.df%>%top_n(1000)
+
+
+# PCA sdf100 + sdf1000+ exprssALL data set
+pxsd.samples<-prcomp(sd.df,retx=TRUE,scale=TRUE)
+pxsd.100<-prcomp(sdf100,retx=TRUE,scale=TRUE)
+pxsd.1000<-prcomp(sdf1000,retx=TRUE,scale=TRUE)
+
+
+# calling first 3 row of rotated x values
+pxsd.samples$x[1:3,]
+pxsd.100$x[1:3,]
+pxsd.1000$x[1:3,]
+
+
+# calling sdev 
+pxsd.samples$sdev
+pxsd.100$sdev
+pxsd.1000$sdev
+
+# calling rotations from PCA
+lxsd.samples <- pxsd.samples$rotation
+lxsd.100 <- pxsd.100$rotation
+lxsd.1000 <- pxsd.1000$rotation
+
+
+# transpose in genes columns 
+# all samples
+all.prcomp <- prcomp(scale(t(df.samples)))
+plot(all.prcomp)
+dim(all.prcomp$x)
+
+all.prcomp$x[1:3,1:3]
+cumsum(all.prcomp$sdev)
+cumsum(all.prcomp$sdev >.50)
+
+
+old.par <- par(mfrow=c(1,2),ps=20)
+plot(all.prcomp$x[,1], all.prcomp$x[,2])
+biplot(all.prcomp)
+par(old.par)
+
+# top100
+prcomp.100 <- prcomp(scale(t(t100)))
+plot(prcomp.100)
+dim(prcomp.100$x)
+
+prcomp.100$x[1:3,1:3]
+cumsum(prcomp.100$sdev)
+cumsum(prcomp.100$sdev >.50)
+
+old.par <- par(mfrow=c(1,2),ps=20)
+plot(prcomp.100$x[,1], prcomp.100$x[,2])
+biplot(prcomp.100)
+par(old.par)
+
+# top1000
+prcomp.1000 <- prcomp(scale(t(t1000)))
+plot(prcomp.1000)
+dim(prcomp.1000$x)
+
+prcomp.1000$x[1:3,1:3]
+cumsum(prcomp.1000$sdev)
+cumsum(prcomp.1000$sdev >.50)
+
+old.par <- par(mfrow=c(1,2),ps=20)
+plot(prcomp.1000$x[,1], prcomp.1000$x[,2])
+biplot(prcomp.1000)
+par(old.par)
+
+# PCA on tranpose (SCALE = TRUE)
+prt.sample<-prcomp(scale(t(df.samples)),scale=TRUE)
+prt.100<-prcomp(scale(t(t100)),scale=TRUE)
+prt.1000<-prcomp(scale(t(t1000)),scale=TRUE)
+
+prt.sample
+prt.100
+prt.1000
+
+# graph BT
+p.all<-pData(ALL)
+bt <- factor(substring(p.all$BT,1,1))
+d.bt<-cbind(exprs(ALL)[1,],bt)
+d.bt<-data.frame(d.bt)
+d.100bt<-cbind(t100[1,],bt)
+d.100bt<-data.frame(d.100bt)
+d.1000bt<-cbind(t1000[1,],bt)
+d.1000bt<-data.frame(d.1000bt)
+
+p.bt<-cbind(prt.sample$x [1,], bt)
+p.bt<- data.frame(p.bt)
+p.100bt<-cbind(prt.100$x [1,],bt)
+p.100bt<-data.frame(p.100bt)
+p.1000bt<-cbind(prt.1000$x [1,],bt)
+p.1000bt<-data.frame(p.1000bt)
+
+ggplot(p.bt, aes(x=V1, y=bt, colour=bt)) + geom_point()
+ggplot(d.bt, aes(x=V1, y=bt, colour=bt)) + geom_point()
+
+ggplot(p.100bt, aes(x=V1, y=bt, colour=bt)) + geom_point()
+ggplot(d.100bt, aes(x=V1, y=bt, colour=bt)) + geom_point()
+
+ggplot(p.1000bt, aes(x=V1, y=bt, colour=bt)) + geom_point()
+ggplot(d.1000bt, aes(x=V1, y=bt, colour=bt)) + geom_point()
+
+```
+
+
+With the graphs observed, the variance of genes show in the graphs as the data set increases the values get tighter within each other.Its the same with the biplot and scatterplot. The points become closer and clustered together as well. In terms of scatterplot values of B and T samples they seemed to have migrated to certain parts of the graph but still in a distance that is 1 value apart the range of course increased as the data points increased as well. 
+
+
+3. (25) Run hierarchical clustering with top 100 and 1000 genes with highest variance as well as all genes in ALL dataset. Visually compare and describe changes in the membership in the several top level clusters for each number of the genes chosen. Compare to PCA results obtained above.
+```{r, error=TRUE}
+# upload library
+library(ALL)
+library(dplyr)
+data(ALL)
+
+# setting variables
+samples<-exprs(ALL)
+df.samples<-data.frame(exprs(ALL))
+t100<-df.samples %>% top_n(100)  # highest 100 values
+t1000<-df.samples %>% top_n(1000)  # highest 1000 values
+
+# variable for all genes finding the highest sample and plotting it
+var.samples<-var(df.samples)
+var.maxsamples<-samples[which.max(var.samples),]
+cvar<-hclust(dist(var.maxsamples))
+plot(cvar)
+plot(var.maxsamples)
+rect.hclust(cvar,4)
+
+
+# variable for top100 genes finding the highest sample and plotting it
+var.100<-var(t100)
+var.s100<-samples[which.max(var.100),]
+cvar100<-hclust(dist(var.s100))
+plot(cvar100)
+plot(var.s100)
+rect.hclust(cvar100,4)
+
+
+
+# variable for top100 genes finding the highest sample and plotting it
+var.1000<-var(t1000)
+var.s1000<-samples[which.max(var.1000),]
+cvar1000<-hclust(dist(var.s1000))
+plot(cvar1000)
+plot(var.s1000)
+rect.hclust(cvar1000,4)
+
+
+```
+
+
+These results seem very different and skewed compared to the results above. The data points seem more spread out and less clustered, but that may be the set values and how each question was plotted. I find it easier to read my data more thoroughly with this graph due to the fact that it seems the values are could be scaled for by filtering out the highest sample.
+Although, the cluster dendrogram is pretty vast due to the large number. This could explain how the data set from question 2 has many points and the debdrigran is reflecting this.
+
+
+4. (25) Run permutation exercise for assessing strengths of clusters formed by using “ward” clustering method on genes with standard deviation across patients greater than one (similar to what was shown in lecture notes). Compare to the results described in the lecture notes.
+
+```{r, error=TRUE}
+# almost to notes run method = ward on original + secondardy 
+library(ALL)
+data(ALL)
+
+# without ward method
+h1 <- hclust(dist(t(exprs(ALL)[apply(exprs(ALL),1,sd)>1.0,])))
+plot(h1,cex=0.7)
+rect.hclust(h1,4)
+hw <- hclust(dist(t(exprs(ALL))))
+hcor <- hclust(as.dist(1-cor(exprs(ALL))))
+par(mfrow=c(2,1))
+plot(hw,cex=0.7)
+plot(hcor,cex=0.7)
+table(HW=cutree(hw,2),HCOR=cutree(hcor,2))
+
+exprs.sd.gt.1 <- exprs(ALL)[apply(exprs(ALL),1,sd)>1.0,]
+hclust.sd.gt.1 <- hclust(dist(t(exprs.sd.gt.1)))
+ori.heights <- hclust.sd.gt.1$height
+exprs.rnd <- t(apply(exprs.sd.gt.1,1,sample))
+plot(hclust(dist(t(exprs.rnd))),cex=0.7)
+rnd.heights <- numeric()
+for ( i.sim in 1:100 ) {
+ exprs.rnd <- t(apply(exprs.sd.gt.1,1,sample))
+ hclust.rnd <- hclust(dist(t(exprs.rnd)))
+ rnd.heights <- c(rnd.heights,hclust.rnd$height)
+}
+plot(ori.heights,rank(ori.heights)/length(ori.heights),
+col="red",xlab="height",ylab="F(height)")
+points(rnd.heights,rank(rnd.heights)/length(rnd.heights),col="blue")
+points(15,0.9,col="red")
+text(15,0.9,"original",col="red",pos=4)
+points(15,0.8,col="blue")
+text(15,0.8,"scrambled",col="blue",pos=4)
+abline(v=c(30,42),lty=2,col="blue")
+plot(hclust.sd.gt.1,cex=0.7)
+abline(h=c(30,42),lty=2,col="blue")
+
+# with ward method
+h1 <- hclust(dist(t(exprs(ALL)[apply(exprs(ALL),1,sd)>1.0,])))
+plot(h1,cex=0.7)
+rect.hclust(h1,4)
+hw <- hclust(dist(t(exprs(ALL))),method="ward")
+hcor <- hclust(as.dist(1-cor(exprs(ALL))))
+par(mfrow=c(2,1))
+plot(hw,cex=0.7)
+plot(hcor,cex=0.7)
+table(HW=cutree(hw,2),HCOR=cutree(hcor,2))
+
+exprs.sd.gt.1 <- exprs(ALL)[apply(exprs(ALL),1,sd)>1.0,]
+hclust.sd.gt.1 <- hclust(dist(t(exprs.sd.gt.1)), method="ward")
+ori.heights <- hclust.sd.gt.1$height
+exprs.rnd <- t(apply(exprs.sd.gt.1,1,sample))
+plot(hclust(dist(t(exprs.rnd))),cex=0.7,method="ward")
+rnd.heights <- numeric()
+for ( i.sim in 1:100 ) {
+ exprs.rnd <- t(apply(exprs.sd.gt.1,1,sample))
+ hclust.rnd <- hclust(dist(t(exprs.rnd)), method="ward")
+ rnd.heights <- c(rnd.heights,hclust.rnd$height)
+}
+plot(ori.heights,rank(ori.heights)/length(ori.heights),
+col="red",xlab="height",ylab="F(height)")
+points(rnd.heights,rank(rnd.heights)/length(rnd.heights),col="blue")
+points(15,0.9,col="red")
+text(15,0.9,"original",col="red",pos=4)
+points(15,0.8,col="blue")
+text(15,0.8,"scrambled",col="blue",pos=4)
+abline(v=c(30,42),lty=2,col="blue")
+plot(hclust.sd.gt.1,cex=0.7)
+abline(h=c(30,42),lty=2,col="blue")
+
+```
+
+
+Comparing both methods, we can see that the samples are more spread out and aligned without the ward method. Once the ward method is engaged, samples seemed to have been change which thus changed our graphs. The cluster dendrograms have been altered dramatically and h cluster is much tighter because it is showing an outlier. This outlier is most likely the cause of our data being skewed.

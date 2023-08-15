@@ -1,0 +1,410 @@
+---
+title: "Homework assignment 6"
+author: "Christopher Tran"
+date: "11/10/2021"
+output:
+  html_document: default
+  pdf_document: default
+---
+1. (15) Phenotype data in ALL dataset contain “BT” attribute that identifies patients with B- and T-cell disease subtypes. Convert “BT” attribute to a categorical variable with just two levels, “B” and “T” (i.e. ignore the finergrained subdivision into B1, B2, etc.; R function substring will help to convert “B1” to “B”, for example) – test all genes for significant association with such B/T disease subtype using ANOVA. Plot distribution of p-values and discuss the findings. Draw boxplot for expression levels of the gene most significantly associated with the subtype, stratified by the B/T subtype.
+
+```{r }
+# calling library
+library(ALL)
+library(dplyr)
+data(ALL)
+# set variables and separated B and T values
+d.bt<-pData(ALL)
+sample<-exprs(ALL)
+df.bt<-data.frame(d.bt)
+headers<-head(sample)
+b.t<-(substring(d.bt$BT,1,1))
+df.bt3<-data.frame(substring(d.bt$COD,1,1))
+df.bt3<-cbind(df.bt,b.t)
+df.bt3
+
+# anova fumction 
+anova.t<- function(x){df.tmp <-data.frame(Expr=x,B.T=df.bt3$b.t,COD=df.bt3$cod)
+anova(lm(Expr~B.T,df.tmp))$Pr[1]}
+
+# apply anova function
+b.t <- apply(sample,1,anova.t)
+b.t
+
+# draw the histogram and boxplot of p-values
+hist(b.t)
+boxplot(b.t)
+```
+2. (15) Test whether there is significant association between “BT” disease subtype in the two-level categorical form (with just B and T levels) and gender of the subjects using contingency tables (Week 5 material).
+
+```{r }
+#call age and place in data frame
+age<-pData(ALL)$age
+sbt.df<-data.frame( age=age, b.t=df.bt3$b.t)
+
+#print data frame and palce in table 
+sbt.df 
+table(sbt.df )
+
+# set chi squareand print
+sbt.chi <- chisq.test(table(sbt.df ),correct=F)
+print(sbt.df )
+sbt.chi$expected
+
+# create table for chi square
+sum((table(sbt.df)-sbt.chi$expected)^2/sbt.chi$expected)
+
+```
+
+3. (15) Using BT attribute in phenotype data in ALL dataset (use the two-level form, B and T) compare mean ages of the patients with B- and T-cell disease using t-test. Then estimate significance of difference between means using permutation approach. Additionally, obtain two confidence intervals on the difference between mean ages of patients with these two types of disease using bootstrap – one using stratified and the other using non-stratified approach. Compare the results and describe your conclusions in writing
+
+
+```{r }
+# setting variables
+x.age <- sbt.df$age 
+x.bt <- sbt.df$b.t
+
+# permutation
+x.keep <- !is.na(x.age)&!is.na(x.bt)
+x.age <- x.age[x.keep] 
+x.bt <- x.bt[x.keep]
+
+# difference in original sample
+diff.ori <- mean(x.age[x.bt=="B"]) -mean(x.age[x.bt=="T"])
+
+#simulation brute-froce pvalue
+diff.sim <- numeric()
+for ( i in 1:10000 ) {
+x.tmp <- sample(x.age) 
+diff.sim[i] <- mean(x.tmp[x.bt=="B"]) - mean(x.tmp[x.bt=="T"]) 
+ }
+sum(abs(diff.sim) >= abs(diff.ori)) / 10000 
+
+# t.test
+t.test(x.age[x.bt=="B"],x.age[x.bt=="T"],var.equal=T)$p.value
+
+
+# boot
+library(boot)
+x.bt<-as.factor(x.bt)
+MF.age.diff <- function(x,i) {
+ age.m <- x[i,"age"][x[i,"x.bt"]=="B"]
+ age.f <- x[i,"age"][x[i,"x.bt"]=="T"]
+ mean(age.m)-mean(age.f)
+}
+x.df<-data.frame(age=x.age)
+x.df<-cbind(x.df,x.bt)
+boot.res <- boot(x.df,statistic=MF.age.diff,10000,strata=x.bt)
+boot.ci(boot.res,type="norm")$normal
+
+# t.test
+t.test(x.age[x.bt=="B"],x.age[x.bt=="T"],var.equal=T)$conf.int
+
+```
+Looking  at both the values that have been received, the boot had only returned the confidence interval and different values comparing the t-test. From the t-test,we had also received the two tails of each value( -2.228889, 8.984383) with a confidence interval of 0.95%. With the boot, we are recieving values of-1.416264, 8.103324. I feel in this case, we would want to use the t.test function more because it may be more accurate than using the boot. The Boot maybe useful to use in a different scenario, but i think in this case, we would want to use the t.test for accuracy.  
+
+4. (15) Calculate FDR for p-values from t-test on gene expression-gender relationship (i.e. comparing mean gene expression values for males and females in ALL dataset). Compare results from FDR with the results of Bonferroni correction for the same set of p-values. Write down your conclusions.
+
+```{r }
+# call library and set premutation
+library(qvalue)
+library(ALL)
+x.sample<-exprs(ALL)
+x.age <- pData(ALL)$age # extract observations for age and sex
+x.sex <- pData(ALL)$sex
+x.keep <- !is.na(x.age)&!is.na(x.sex)
+x.age <- x.age[x.keep] # remove NA’s from the data
+x.sex <- x.sex[x.keep]
+
+# function for t.test and application
+ft.test<-function(x)t.test(x[pData(ALL)$sex=="F"],x[pData(ALL)$sex=="M"],p.adjust.method="bonferroni")$p.value
+exprss.sample<- apply(x.sample,1,ft.test)
+
+# qvalue and plot
+qvalue.sample<-qvalue(exprss.sample)
+plot(hist(qvalue.sample,plot=F,breaks=20),xlab="t-test p-value",
+main="Both samples from N(0,1)")
+plot(hist(qvalue.sample,plot=F,breaks=20),
+xlab="t-test p-value",main="One from N(0,1), another - N(1,1)")
+plot(sort(qvalue.sample$qvalues),ylab="FDR")
+plot(exprss.sample)
+plot(qvalue.sample)
+```
+Looking at the results and plotted graphs, we know that we can see with the qvalue function that the pvalue, qvalue and lamda seem to be relatively close and similar to or pass significance. On the other hand with the significant test it seems to have an expansional growth at the end end which may lead to the expected false positives. 
+
+5. (20) Compare results of significance of gene expression and patient age relationship as assessed by ANOVA on linear model fit (same as we did before) and by permutation approach. Do not analyze all genes. Use the following three genes for this exercise: 40419_at, 445_at and 33925_at – for high, medium and not significant relationships between age and gene expression. For permutation based significance assessment obtain distributions both of: a) regression coefficient for slope of the fit (as returned by coef) and b) variance explained by it (as returned by anova in “Sum Sq” attribute). Derive resampling-based p-values for both these statistics by comparing their values from original fit with their distributions simulated under the null hypothesis of no association between gene expression level and age (this is the null we implement by permuting ages and/or gene expressions!). Describe results in writing and present them in the form of histograms of simulated distributions
+
+```{r 40419_at, 445_at and 33925_at}
+# setting variables
+library(qvalue)
+library(ALL)
+data(ALL)
+sample<-exprs(ALL)
+age<-ALL$age
+cOD<-ALL$cod
+
+# create function for data frame to place x value for anova
+pval <- function(x){
+ padf <- data.frame(samples=x,age=ALL$age)
+anova(lm(age~samples,padf))["Pr(>F)"]
+}
+
+# apply function and samples in variables
+Spval<-apply(sample,1,pval)
+
+#setting variables for samples
+sample1<-Spval["40419_at"]
+sample2<-Spval["445_at"]
+sample3<-Spval["33925_at"]
+
+#setting variables for samples
+sample1<-exprs(ALL)["445_at",]
+sample2<-exprs(ALL)["40419_at",]
+sample3<-exprs(ALL)["33925_at",]
+x.age <- pData(ALL)$age 
+x.gene <- pData(ALL)$cod
+
+# premutation
+x.keep1 <- !is.na(x.age)&!is.na(sample1)
+x.age1 <- x.age[x.keep1] 
+x.gene1 <- x.gene[x.keep1]
+x.age1<-na.omit(x.age1)
+x.gene1<-na.omit(x.gene1)
+
+x.keep1 <- !is.na(x.age)&!is.na(sample1)
+x.age1 <- x.age[x.keep1] 
+x.gene1 <- x.gene[x.keep1]
+x.age1<-na.omit(x.age1)
+x.gene1<-na.omit(x.gene1)
+
+x.keep2 <- !is.na(x.age)&!is.na(sample2)
+x.age2 <- x.age[x.keep2] 
+x.gene2 <- x.gene[x.keep2]
+x.age2<-na.omit(x.age2)
+x.gene2<-na.omit(x.gene2)
+
+x.keep3 <- !is.na(x.age)&!is.na(sample3)
+x.age3 <- x.age[x.keep3] 
+x.gene3 <- x.gene[x.keep3]
+x.age3<-na.omit(x.age3)
+x.gene3<-na.omit(x.gene3)
+
+# setting lm
+lmg1<-lm(x.gene1~x.age1)
+lmg2<-lm(x.gene2~x.age2)
+lmg3<-lm(x.gene3~x.age3)
+
+lmg1
+lmg2
+lmg3
+
+# anova for lm models for p value and summary
+anova(lmg1)[5]
+anova(lmg2)[5]
+anova(lmg3)[5]
+
+summary(lmg1)$coefficients[,4]
+summary(lmg2)$coefficients[,4]
+summary(lmg3)$coefficients[,4]
+
+# histogram graph
+hist(x.age)
+hist(sample1)
+hist(sample2)
+hist(sample3)
+
+
+
+```
+
+6. (20) For the same three genes as above derive confidence intervals (CIs) for the same two quantities: 1) for the regression coefficient for slope of the gene 
+expression vs age fit and 2) for the variance explained by it using bootstrap. 
+
+• Obtain two bootstrapped CIs for each statistics: one based on normal 
+approximation and one percentile-based. 
+
+• For the slope of the regression compare bootstrap-based CIs with the 
+ones calculated by confint on the linear model fit. 
+
+• Present results in the form of numerical values of CIs and histograms 
+of bootstrapped distributions of the two statistics under study (Hint: 
+look at $t element of the bootstrap object returned by boot()). 
+
+• Describe consistency between CIs calculated under the assumption of 
+normality and using percentiles of the empirical distribution of the test 
+statistics (as generated by boot()). 
+
+• Describe how this agreement between these two values depends on the 
+strength of the relationship between patient age and gene expression 
+level
+
+
+```{r, error=TRUE }
+
+confint(lmg1)
+confint(lmg2)
+confint(lmg3)
+
+dfg1<-cbind(x.age1,x.gene1)
+dfg2<-cbind(x.age2,x.gene2)
+dfg3<-cbind(x.age3,x.gene3)
+diff.ori <- mean(x.age[x.gene1])
+diff.ori2 <- mean(x.age[x.gene2])
+diff.ori3 <- mean(x.age[x.gene3])
+diff.sim <- numeric()
+for ( i in 1:10000 ) {
+x.tmp <- sample(x.age1) 
+diff.sim[i] <- mean(x.tmp[x.gene1])
+ }
+sum(abs(diff.sim) >= abs(diff.ori)) / 10000 # brute-force p-value
+
+t.test(x.age1,x.gene1,var.equal=T)$p.value
+
+
+library(boot)
+age.gene <- function(x,i) {
+ age.gene <- x[i,"x.age1"][x[i,"x.gene1"]]
+}
+x.df.ga <- data.frame(gene=x.gene1,age=x.age1)
+boot.res <- boot(x.df.ga,
+ statistic=age.gene,10000,strata=x.age1)
+boot.ci(boot.res,type="norm")$normal
+
+t.test(x.gene1,x.age1)$conf.int
+hist(x.df.ga)
+
+diff.sim2 <- numeric()
+for ( i in 1:10000 ) {
+x.tmp <- sample(x.age2) 
+diff.sim2[i] <- mean(x.tmp[x.gene2])
+ }
+sum(abs(diff.sim2) >= abs(diff.ori2)) / 10000 # brute-force p-value
+
+t.test(x.age2,x.gene2,var.equal=T)$p.value
+
+
+age.gene2 <- function(x,i) {
+ age.gene2 <- x[i,"x.age2"][x[i,"x.gene2"]]
+}
+x.df.ga <- data.frame(gene=x.gene2,age=x.age2)
+boot.res <- boot(x.df.ga,
+ statistic=age.gene2,10000,strata=x.age2)
+boot.ci(boot.res,type="norm")$normal
+
+t.test(x.gene2,x.age2)$conf.int
+hist(x.df.ga2)
+
+
+diff.sim2 <- numeric()
+for ( i in 1:10000 ) {
+x.tmp <- sample(x.age3) 
+diff.sim2[i] <- mean(x.tmp[x.gene3])
+ }
+sum(abs(diff.sim3) >= abs(diff.ori3)) / 10000 # brute-force p-value
+
+t.test(x.age2,x.gene3,var.equal=T)$p.value
+
+
+age.gene3 <- function(x,i) {
+ age.gene3 <- x[i,"x.age3"][x[i,"x.gene3"]]
+}
+x.df.ga3 <- data.frame(gene=x.gene3,age=x.age3)
+boot.res <- boot(x.df.ga3,
+ statistic=age.gene3,10000,strata=x.age3)
+boot.ci(boot.res,type="norm")$normal
+
+t.test(x.gene3,x.age3)$conf.int
+hist(x.df.ga3)
+
+
+```
+7. *Extra credit* (10) Calculate FDR for p-values from gene effect on patient age as estimated by anova on linear model fit. Compare results with the results of Bonferroni correction for the same set of p-values. Describe in writing the results of such comparison
+
+
+```{r, error=TRUE}
+library(ALL)
+library(qvalue)
+data(ALL)
+sample<-exprs(ALL)
+age<-ALL$age
+qvalue(exprss.sample)
+
+qvalue<-qvalue(sample)$qvalue
+
+pvals<- numeric()
+for (i in sample) {
+y <- ALL$age # x/y: control/disease measurements for no-change genes 
+pvals[i] <- t.test(y,i)$p.value
+}
+
+oldpar <- par(mfrow=c(3,1))
+hist(pvals,breaks=20,xlim=c(0,1))
+
+hist(pvals,breaks=20,xlim=c(0,1))
+hist(c(pvals),breaks=20,xlim=c(0,1))
+par(oldpar)
+
+plot(qvalue.sample)
+# create function for data frame to place x value for anova
+pval <- function(x){
+ padf <- data.frame(samples=x,age=ALL$age)
+ anova(lm(age~samples,padf))
+}
+
+# apply function and samples in variables
+Spval<-apply(sample,1,pval)
+
+
+
+```
+8. *Extra credit* (10) For each gene, compare average gene expression levels between patients with B- and T-cell disease using t-test. Calculate FDR for this set of p-values and compare it with the results of Bonferroni corrected number of significant genes for the same set of p-values. Describe your findings in plain English.
+
+```{r, error=TRUE }
+library(ALL)
+sbt.df$age 
+sbt.df$b.t
+
+x.age <- sbt.df$age 
+# x.sex <- pData(ALL)$sex
+x.bt <- sbt.df$b.t
+
+# x.age <- pData(ALL)$age # extract observations for age and sex
+# x.sex <- pData(ALL)$sex
+# x.bt <- df.bt3$df.bt2
+# x.keep <- !is.na(x.age)&!is.na(x.sex)
+x.keep <- !is.na(x.age)&!is.na(x.bt)
+x.age <- x.age[x.keep] # remove NA’s from the data
+# x.sex <- x.sex[x.keep]
+x.bt <- x.bt[x.keep]
+
+library(qvalue)
+library(ALL)
+x.sample<-exprs(ALL)
+x.age <- pData(ALL)$age # extract observations for age and sex
+x.sex <- pData(ALL)$sex
+x.keep <- !is.na(x.age)&!is.na(x.sex)
+x.age <- x.age[x.keep] # remove NA’s from the data
+x.sex <- x.sex[x.keep]
+
+ft.test<-function(x)t.test(x[pData(ALL)$sex=="F"],x[pData(ALL)$sex=="M"],p.adjust.method="bonferroni")$p.value
+exprss.sample<- apply(x.sample,1,ft.test)
+
+library(boot)
+x.bt<-as.factor(x.bt)
+MF.age.diff <- function(x,i) {
+ age.m <- x[i,"age"][x[i,"sex"]=="M"]
+ age.f <- x[i,"age"][x[i,"sex"]=="F"]
+ mean(age.m)-mean(age.f)
+}
+
+x.df.tmp <- data.frame(age=x.age,sex=x.sex)
+boot.res <- boot(x.df.tmp,statistic=MF.age.diff,10000,strata=x.sex)
+boot.ci(boot.res,type="norm")$normal
+ 
+t.test(x.age[x.sex=="M"],x.age[x.sex=="F"],var.equal=T)$conf.int
+
+
+```
+
+
+

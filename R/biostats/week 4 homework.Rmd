@@ -1,0 +1,286 @@
+---
+title: "Assignment 4"
+author: "Christopher Tran"
+date: "10/28/2021"
+output: word_document
+---
+1. (20) Obtain results for standard error of the mean, confidence intervals and CLT convergence for random samples drawn from exponential distribution 
+
+a. Reproduce plot of standard error of the mean (as shown in Notes, Part 1) for exponential distribution (using rexp). Remember that population variance for exponential distribution with rate λ is 1/ λ^2.
+
+b. Demonstrate the calculation of confidence interval for a mean of a random sample drawn from exponential distribution – both using confint and mean, sd, qt – make sure the two approaches produce the same answer (see Part 3 of the Notes, finish what we started there)
+
+c. Generate plots illustrating CLT convergence to normality for the sum of i.i.d. variables distributed according to the exponential distribution(similar to Part 2; do not fall into a trap: in contrast to Bernoulli distribution, we do not have a ready-to-use analytical expression for a sum of n exponential random variables, so you will have to sample explicitly and sum up the samples drawn).
+```{r}
+
+# a. Reproduce plot of standard error of the mean (as shown in Notes, Part 1) for exponential distribution (using rexp). Remember that population variance for exponential distribution with rate λ is 1/ λ^2.
+
+# set variables 
+smpl.sizes <- c(1,2,4,8,16,32,64,256) # sample sizes
+r.mu <- numeric()
+r.sem <- numeric()
+n.sim <- 1000
+# set loop and placed rexp function
+for ( i.smpl in smpl.sizes ) {
+ r.mat <- matrix(rexp(i.smpl*n.sim),
+ nrow=n.sim,ncol=i.smpl)
+ mu.tmp <- apply(r.mat,1,mean)
+ r.mu <- c(r.mu,mean(mu.tmp))
+ r.sem <- c(r.sem,sd(mu.tmp))
+}
+# plot graph
+plot(c(min(smpl.sizes),max(smpl.sizes)),c(min(c(r.mu,r.sem)),max(c(r.mu,r.sem))), type="n",ylab="Mean and SEM",xlab="n",sub=paste(n.sim,"sims"))
+points(smpl.sizes,r.mu,type="l",lty=2)
+points(smpl.sizes,r.sem,col="blue")
+points(smpl.sizes,1/sqrt(smpl.sizes),type="l",col="blue")
+
+
+
+# b. Demonstrate the calculation of confidence interval for a mean of a random sample drawn from exponential distribution – both using confint and mean, sd, qt – make sure the two approaches produce the same answer (see Part 3 of the Notes, finish what we started there)
+
+# setting values with rexp
+n<-5
+x <- rexp(n) 
+df<- n-1
+
+# find confidence interval
+confint(lm(x~1))
+
+# summary of LM model
+summary(lm(x~1))$coefficients 
+
+# set variables to perform manual calculations
+
+xm<-mean(x)
+xsd<-sd(x)
+xqt<-qt(0.975,df)
+mge<-xqt*(xsd/sqrt(n))
+ci1<-xm-mge
+ci2<-xm+mge
+tci<- c(ci1, ci2)
+
+# print out values
+xm
+xsd
+xqt
+mge
+tci
+
+
+
+# c. Generate plots illustrating CLT convergence to normality for the sum of i.i.d. variables distributed according to the exponential distribution(similar to Part 2; do not fall into a trap: in contrast to Bernoulli distribution, we do not have a ready-to-use analytical expression for a sum of n exponential random variables, so you will have to sample explicitly and sum up the samples drawn).
+
+#setting variables  
+smpl.sizes <- 2^(0:8) 
+n.sim <- 1000 
+
+# for loop to run plot for rexp
+old.par <- par(mfrow=c(3,3),ps=20) 
+for ( i.smpl in smpl.sizes ) { 
+ x.tmp <- rexp(n.sim,i.smpl) 
+ plot(hist(x.tmp,plot=F),
+ main=paste("n =",i.smpl),
+ xlab="Sum(Xn)",ylab="N(sum)")
+ }
+
+```
+
+
+
+2. (20) Same as Problem 1, but this time obtain results for standard error of the mean, confidence intervals and CLT convergence for random samples drawn from the uniform distribution: 
+
+a. Reproduce plot of standard error of the mean (as in Part 1) for uniformdistribution (using runif). Remember that population variance for a random variable uniformly distributed between a and b is (ba)2/12.
+
+b. Reproduce example of confidence interval calculation for a mean of a sample from uniform distribution – both using confint and mean, sd, qt – make sure the two approaches produce the same answer 
+
+c. Reproduce plots illustrating CLT convergence to normality for the sum of uniform distribution
+```{r }
+# a. Reproduce plot of standard error of the mean (as in Part 1) for uniformdistribution (using runif). Remember that population variance for a random variable uniformly distributed between a and b is (ba)2/12.
+# population variance = (b-a)^2/12
+
+# set variables
+smpl.sizes <- c(1,2,4,8,16,32,64,256) # sample sizes
+r.mu <- numeric()
+r.sem <- numeric()
+n.sim <- 1000
+
+# set loop and placed runif function
+for ( i.smpl in smpl.sizes ) {
+ r.mat <- matrix(runif(i.smpl*n.sim),
+ nrow=n.sim,ncol=i.smpl)
+ mu.tmp <- apply(r.mat,1,mean)
+ r.mu <- c(r.mu,mean(mu.tmp))
+ r.sem <- c(r.sem,sd(mu.tmp))
+}
+
+# plot graph
+plot(c(min(smpl.sizes),max(smpl.sizes)),c(min(c(r.mu,r.sem)),max(c(r.mu,r.sem))), type="n",ylab="Mean and SEM",xlab="n",sub=paste(n.sim,"sims"))
+points(smpl.sizes,r.mu,type="l",lty=2)
+points(smpl.sizes,r.sem,col="blue")
+points(smpl.sizes,1/sqrt(smpl.sizes),type="l",col="blue")
+
+
+#b. Reproduce example of confidence interval calculation for a mean of a sample from uniform distribution – both using confint and mean, sd, qt – make sure the two approaches produce the same answer
+
+# setting values with runif
+n<-5
+x <- runif(n)
+df<- n-1
+
+#find confidence interval
+confint(lm(x~1))
+
+# summary of LM model
+summary(lm(x~1))$coefficients 
+
+# set variables to perform manual calculations
+xm<-mean(x)
+xsd<-sd(x)
+xqt<-qt(0.975,df)
+mge<-xqt*(xsd/sqrt(n))
+ci1<-xm-mge
+ci2<-xm+mge
+tci<- c(ci1, ci2)
+
+# print out values
+xm
+xsd
+xqt
+mge
+tci
+
+# c. Reproduce plots illustrating CLT convergence to normality for the sum of uniform distributio
+
+#setting variables
+smpl.sizes <- 2^(0:8) 
+n.sim <- 1000 
+
+# for loop to run plot for runif
+old.par <- par(mfrow=c(3,3),ps=20) 
+for ( i.smpl in smpl.sizes ) { 
+ x.tmp <- runif(i.smpl) 
+ plot(hist(x.tmp,plot=F),
+ main=paste("n =",i.smpl),
+ xlab="Sum(Xn)",ylab="N(sum)")
+ }
+
+```
+
+
+3. (40) Run a simulation in order to study the dependence between performance of confidence intervals, sample size they were calculated on, and shape of the random distribution generating the data sample.
+Specifically, for sample sizes ranging from 2 to 1000 (2,8,16,…,512,1024 or 
+something like that)
+• draw several thousand samples of each size from: normal, exponential and uniform distributions, 
+
+• calculate confidence interval of the mean for each of the samples from each of the three distributions independently (using confint for simplicity sake) and determine whether each of the confidence intervals contains the true mean (i.e. expected value) of the corresponding population that generated this sample (0 for normal, 1 for exponential with rate of one, 0.5 for uniform between zero and one). 
+
+• For each sample size and for each of the three underlying distributions under study, calculate percentages F (“failure”) of simulations, in which confidence intervals do NOT contain true mean of the respective distributions. Present results as the plots of F vs sample size for each of the three distributions (draw all three lines in one plot). Describe in plain English how percentage of misses depends on sample size and shape of the distribution, from which the samples are drawn. This is supposed to be a very instructive exercise that should help you develop intuition about what “confidence” means for confidence intervals. You might find it easier to do it first for normal distribution and then repeat for uniform and exponential adjusting function generating it and true mean accordingly
+```{r }
+
+# set variables
+n1<-2^(1:10)
+n2<-1000
+n3<-n1*n2
+p.norm<- numeric()
+p.exp<-numeric()
+p.runif<-numeric()
+pfailnorm<-numeric()
+pfailexp<-numeric()
+pfailrunif<-numeric()
+
+# creating loop for matrix per sample
+for (sample in n2){
+        # generate matrix
+        p.norm<-matrix(rnorm(sample*n3),ncol=n1, nrow=n2)
+        p.exp<-matrix(rexp(sample*n3),ncol=n1, nrow=n2)
+        p.runif<-matrix(runif(sample*n3),ncol=n1, nrow=n2)
+        
+        #creating loop to create data frame and loop each sample in confidence interval 
+        for (i.sim in 1:n2){
+                pnorm2<-as.data.frame(p.norm)
+                pexp2<-as.data.frame(p.exp)
+                prunif2<-as.data.frame(p.runif)
+         
+                pnorm3<-confint(lm(n1~1,pnorm2[i.sim,]))
+                pexp3<-confint(lm(n1~1,pexp2[i.sim,]))
+                prunif3<-confint(lm(n1~1,prunif2[i.sim,]))
+                
+                # creaing mean value to find failure rate
+                pnorm4<-apply(pnorm2,2,mean)
+                pexp4<-apply(pexp2,2,mean)
+                prunif4<-apply(prunif2,2,mean)
+                
+                # failure rate for each sample
+                pfailnorm<-c(pnorm4[1]-abs(pnorm3[1]),pnorm4[1]-abs(pnorm3[2]))
+                pfailexp<-c(pexp4[1]-abs(pexp3[1]),pexp4[1]-abs(pexp3[2]))
+                pfailrunif<-c(prunif4[1]-abs(prunif3[1]),prunif4[1]-abs(prunif3[2]))
+               
+               
+                }
+        
+}
+# print values for each failure
+pfailnorm
+pfailexp
+pfailrunif
+
+plot(c(pfailnorm,pfailexp,pfailrunif),type="line" ,main="plots of norm, exp, runif")
+lines(pfailexp)
+lines(pexp3)
+lines(pfailrunif)
+
+
+
+
+```
+Looking at each line, we can see there is a similar distribution from point to point. The only difference is the mean difference which sets them apart from each other. I would think that if these means were higher, they would be relatively closer to each other as we see here. Given the fact we used the same data set, I am not surprised the confidience interval to show the same results from each other.  
+
+
+4. (20) Build linear models of age effect on gene expression in ALL – one for the most significant age effect on gene expression, and another one – for an intermediate or insignificant age effect. Determine confidence intervals on the parameters in the model (use confint(), no need to try to calculate the intervals manually). Describe results in plain English
+```{r }
+# set variables
+library(ALL)
+data(ALL)
+sample<-exprs(ALL)
+age<-ALL$age
+
+# create function for data frame to place x value for anova
+pval <- function(x){
+ padf <- data.frame(samples=x,age=ALL$age)
+ anova(lm(age~samples,padf))["samples","Pr(>F)"]
+}
+
+# apply function and samples in variables
+Spval<-apply(sample,1,pval)
+
+
+# locate and print out gene and min and max of pvalue
+minsp<-Spval[which.min(Spval)]
+maxsp<-Spval[which.max(Spval)]
+
+# locating lowest and highest sample in genes
+Ming<-exprs(ALL)[which.min(Spval),]
+Mostg<-exprs(ALL)[which.max(Spval),]
+
+# create data frame for lowest and highest with gene and age
+dgmi<-data.frame(Gene=Ming,Age=age)
+dgmg<-data.frame(Gene=Mostg,Age=age)
+
+# find confidience interval of age and gene
+lmmi<-confint(lm(Age~Gene,dgmi))
+lmm<-confint(lm(Age~Gene,dgmg))
+
+# give summary of age and gene
+slmmi<-summary(lm(Age~Gene,dgmi))
+slmm<-summary(lm(Age~Gene,dgmg))
+
+# print out statements
+lmm
+slmm
+
+lmmi
+slmmi
+
+
+```
+Looking at the confidence interval of 97.5 for the most and least genes, We can see the significance of data can be skewed greatly from the most to least amounts of genes. The least amount of genes confidence intervals are farther apart since one is -12 and the other is 12.  Looking at the most, it is much more closely together from 3 to 9. This maybe the fact that the least amount of genes in the data set had significantly lower values and sample size as the greater had a much bigger sample size and sample value. I pulled the summary to compare each gene and the values are pretty significant comparing each one. Some of the values are close, but the p-vaule is pretty significant from each other. 

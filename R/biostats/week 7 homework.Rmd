@@ -1,0 +1,576 @@
+---
+title: "homework assign 7"
+author: "Christopher Tran"
+date: "11/16/2021"
+output:
+  html_document: default
+  pdf_document: default
+---
+1. (20) Calculate values in “Sum Sq” and “Mean Sq” columns of the output from anova function executed on linear model. You can use, for instance, linear model of relationship between days-to-remission and expression levels of gene 34852_g_at, and run anova on the resulting model fit. Compute manually (using mean() and predict()) the values for sum of squares and mean sum of squares and confirm that these numbers are exactly what is shown in ANOVA output. Remember that for the model term, sum of the squares represents variance explained by the fit as compared to the simplest model where each prediction is the grand mean of the response, and that the residual sum of squares is the variance in the response that remained unexplained by the fit.
+[This is material from Midterm week].
+```{r,error=TRUE  }
+# calling library and setting variable
+library(ALL)
+data(ALL)
+ALL.pdat <- pData(ALL)
+date.cr.chr <- as.character(ALL.pdat$date.cr)
+diag.chr <- as.character(ALL.pdat$diagnosis)
+date.cr.t <- strptime(date.cr.chr,"%m/%d/%Y")
+diag.t <- strptime(diag.chr,"%m/%d/%Y")
+days2remiss <- as.numeric(date.cr.t - diag.t)
+x.d2r <- as.numeric(days2remiss)
+exprs.34852 <- exprs(ALL)["34852_g_at",]
+d2r.34852 <- data.frame(G=exprs.34852,D2R=x.d2r)
+d2r.34852<-na.omit(d2r.34852)
+d2r.34852
+
+# setting lm
+lm.34852.g.at <- lm(D2R~G,d2r.34852,na.action=na.exclude)
+x.tmp <- pretty(d2r.34852$G,10)
+new.df.ci <- data.frame(G=x.tmp) 
+exprs.34852
+lm.34852.g.at
+d2r.34852
+
+# creating sum sq and mean sq anova
+sum((predict(lm.34852.g.at) - mean(d2r.34852$G,na.rm=T))^2)
+anova(lm.34852.g.at)
+mean(d2r.34852$G)^2
+sum(lm.34852.g.at$residuals^2)
+
+
+```
+
+2. (20) Study how assessment of predictive accuracy of the model changes from one run of five-fold cross-validation to another. Compare it to the stability of assessment of accuracy by bootstrap. Use 10, 100 and 1000 bootstrap samples and study how stability of predictive accuracy by bootstrap depends on the number of bootstrap samples used. In this exercise, in order to assess “stability” of a whole resampling run, you need to repeat the whole runmultiple times. For instance, for cross-validation, use the five-fold crossvalidation core code from the Notes, repeat the whole cross-validation N.reptimes, see how much the results change from run to run. Same for bootstrap.Draw a boxplot that compares distributions of per-run MSE obtained with each of the four methods (cross-validation, bootstrap with n=10, 100, 1000): after N.rep repetitions of the code from the Notes you should have N.rep estimates for the MSE
+```{r,error=TRUE }
+
+# setting variable
+library(ALL)
+data(ALL)
+ALL.pdat <- pData(ALL)
+date.cr.chr <- as.character(ALL.pdat$date.cr)
+diag.chr <- as.character(ALL.pdat$diagnosis)
+date.cr.t <- strptime(date.cr.chr,"%m/%d/%Y")
+diag.t <- strptime(diag.chr,"%m/%d/%Y")
+days2remiss <- as.numeric(date.cr.t - diag.t)
+x.d2r <- as.numeric(days2remiss)
+exprs.34852 <- exprs(ALL)["34852_g_at",]
+d2r.34852 <- data.frame(G=exprs.34852,D2R=x.d2r)
+d2r.34852<-na.omit(d2r.34852)
+
+n.sim<-1000 # Object for the number of times we want to rerun the whole procedure (crossval or boot) (1000)
+n.xval<-5 # Object for the number of crossvalidations (we want 5x crossval)
+xval.grps <- sample(1:dim(d2r.34852)[1]%%n.xval+1)
+
+mse.xval<- numeric() # Create numeric object to save MSEs for crossval here
+n.boot<-c(10,100,1000)
+# Create list Object to save MSEs for 3 boots (10, 100, 1000)
+s2.boot <- numeric()
+mse.boot<-numeric()
+n.obs <- dim(d2r.34852)[1] # number of observation (data points)
+# we run a single loop here, n.sim times, in which we rerun both 5x crossval and boots
+for ( i.sim in 1:n.sim ) {
+# rerun the whole 5x-crossval and boot multiple times:
+# split data randomly into 5 groups for the current rerun of 5x crossval:
+  for ( i.boot in 1:n.boot ) {
+    train.idx <- sample(n.obs,replace=T) # indexes for training set
+ # test set=indices not used in training set:
+    test.idx <- (1:n.obs)[!(1:n.obs)%in%train.idx]
+    train.df <- d2r.34852[train.idx,] # select training data
+    test.df <- d2r.34852[test.idx,] # select test data
+    lm.boot <- lm(D2R~G,train.df) # fit model on training set
+    test.pred <- predict(lm.boot,test.df) # predict on test set
+    s2.boot <- c(s2.boot,(test.pred-test.df$D2R)^2)
+    }
+  # boot variable
+  mse.boot[i.sim] <- mean(s2.boot,na.rm=T)
+  mse.boot[i.sim]
+}
+mse.boot 
+
+mse.boot2<-numeric()
+n.xval <- 5 # number of groups to split data into
+# generate and permute group labels (i.e. assign 
+# datapoints to groups 1..5 randomly):
+val.grps <- sample(1:dim(d2r.34852)[1]%%n.xval+1)
+s2.xval <- numeric()
+for ( i.xval in 1:n.xval ) { # for each group:
+ # set group i aside as ‘test set’
+ test.df <- d2r.34852[xval.grps==i.xval,]
+ train.df <- d2r.34852[xval.grps!=i.xval,] # the rest is “training”
+ lm.xval <- lm(D2R~G,train.df) # fit the model on the training set
+ test.pred <- predict(lm.xval,test.df) # predict on test set
+ s2.xval <- c(s2.xval,(test.pred-test.df$D2R)^2)
+}
+# set and print mean
+mse.xval <- mean(s2.xval,na.rm=T)
+mse.xval
+# print summary
+summary(lm.34852.g.at)$sigma^2
+# creating bootstrap with  10,100,1000
+n2.boot<-c(10,100,1000)
+for ( n.boot in n2.boot) {
+  s2.boot <- numeric()
+  n.obs <- dim(d2r.34852)[1]
+  for ( i.boot in 1:n.boot ) {
+    test.idx <- (1:n.obs)[!(1:n.obs)%in%train.idx]
+    train.df <- d2r.34852[train.idx,] # select training data
+    test.df <- d2r.34852[test.idx,] # select test data
+    lm.boot <- lm(D2R~G,train.df) # fit model on training set
+    test.pred <- predict(lm.boot,test.df) # predict on test set
+    s2.boot <- c(s2.boot,(test.pred-test.df$D2R)^2)
+  }
+  # set variable and pritn
+  mse.boot2[n.boot] <- mean(s2.boot,na.rm=T)
+  mse.boot2[n.boot]
+
+}
+
+mse.boot2
+
+
+# cross validation
+n.xval <- 5 # number of groups to split data into
+# generate and permute group labels (i.e. assign 
+# datapoints to groups 1..5 randomly):
+val.grps <- sample(1:dim(d2r.34852)[1]%%n.xval+1)
+s2.xval <- numeric()
+mse.xval2<-numeric()
+for ( i.sim in 1:n.sim ) {
+  for ( i.xval in 1:n.xval ) { # for each group:
+    # set group i aside as ‘test set’
+    test.df <- d2r.34852[xval.grps==i.xval,]
+    train.df <- d2r.34852[xval.grps!=i.xval,] # the rest is “training”
+    lm.xval <- lm(D2R~G,train.df) # fit the model on the training set
+    test.pred <- predict(lm.xval,test.df) # predict on test set
+    s2.xval2 <- c(s2.xval,(test.pred-test.df$D2R)^2)
+    }
+  # set variable
+  mse.xval2[i.sim] <- mean(s2.xval2,na.rm=T)
+  mse.xval2[i.sim]
+}
+mse.xval2
+
+# summary
+summary(lm.34852.g.at)$sigma^2
+# boxplot
+boxplot(mse.boot,mse.boot2,mse.xval,mse.xval2)
+
+
+
+
+```
+
+
+3. (20) Use cross-validation and bootstrap in order to assess stability and predictive accuracy of the model built by choosing the gene with the most significant association with days-to-remission anew for each round of crossvalidation and bootstrap (i.e. run 12K anova tests for each selected crossvalidation or bootstrtapped sample!). This was done for cross-validation in the Notes. Do the same for bootstrap with, e.g., n=100. Similar to problem 2, rerun each procedure (whole cross-validation or bootstrap) multiple times and observe how stable the results are. This time we want to track MSE and the actual most significant gene selected. In both methods track which genes were chosen for the model each time and generate a table with counts of top genes (e.g. gene ABC selected 256 times, CDE selected 124 times, etc).. Compare the accuracy assessment with one obtained by the same techniques but using the gene chosen on the basis of anova analysis on the entire dataset. Draw a boxplot showing the distribution of MSE estimates for cross-validation and bootstrap with single pre-selected gene and with the gene selected anew in each step (as generated in this problem) [you should have N.rep estimates 
+for each type of the MSE].
+
+```{r,error=TRUE  }
+# calling library and setting variable
+library(ALL)
+library(limma)
+
+days2remiss <- as.numeric(date.cr.t - diag.t)
+exprs.tmp <- exprs(ALL)[,!is.na(days2remiss)]
+days2remiss <- days2remiss[!is.na(days2remiss)]
+design.matrix <- cbind(rep(1,length(days2remiss)),days2remiss)
+
+days2remiss <- as.numeric(date.cr.t - diag.t)
+ALL.exprs <- exprs(ALL)[,!is.na(days2remiss)]
+days2remiss <- days2remiss[!is.na(days2remiss)]
+design.matrix <- cbind(rep(1,length(days2remiss)),days2remiss)
+
+# setting simulation and cross validation
+all.best.xval.genes<- # character object to save best gene
+mse.xval.anew<-numeric() # numeric vector to save mean sq. error
+n.sim<-100
+n.xval<-5
+mse.xval4<-numeric()
+##### rerun 5x crossval n.sim times (100, defined in previous problem) ####
+for ( i.sim in 1:n.sim ) {
+  for ( i.xval in 1:n.xval ) { # for each group:
+    # set group i aside as ‘test set’
+    test.df <- d2r.34852[xval.grps==i.xval,]
+    train.df <- d2r.34852[xval.grps!=i.xval,] # the rest is “training”
+    lm.xval <- lm(D2R~G,train.df) # fit the model on the training set
+    test.pred <- predict(lm.xval,test.df) # predict on test set
+    s2.xval3 <- c(s2.xval,(test.pred-test.df$D2R)^2)
+    }
+  mse.xval4[i.sim] <- mean(s2.xval3,na.rm=T)
+}
+
+anova(lm.xval)
+mse.xval4
+# for the current re-reun of 5x crossval, split the data into 5 groups, randomly
+
+#### run 5 crossvals ####
+#########################
+s2.xval4 <- numeric()
+for ( i.xval in 1:n.xval ) {
+  # training expression values for all genes
+  ALL.exprs.train <- ALL.exprs[,xval.grps!=i.xval]
+  # corresponding design matrix must have entries only for the data points (D2R values) that were selected into the training set
+  design.matrix.train <- design.matrix[xval.grps!=i.xval,]
+  # fit all genes agains D2R (12K models!!!)
+  d2r.fit.train <- lmFit(ALL.exprs.train,design.matrix.train)
+  # save best gene from current run
+  all.best.xval.genes <- rownames( topTable( eBayes(d2r.fit.train),"days2remiss") )[1]
+  cat(all.best.xval.genes," ",fill=i.xval==n.xval)
+  # build the data frame that contains the expression values of the best gene we just
+  tmp.df <- data.frame(G=ALL.exprs[all.best.xval.genes,],D2R=days2remiss)
+  # selected and D2R values; select from it values (patients) that fell into either the
+  lm.xval <- lm(D2R~G,tmp.df[xval.grps!=i.xval,])
+  # predict on the test set and save the squared errors. This part is the same as in
+  test.pred <- predict(lm.xval,tmp.df[xval.grps==i.xval,])
+  # problem 2, except that the best gene was calculated for this particular training set:
+  s2.xval4 <- c(s2.xval4,(test.pred- tmp.df[xval.grps==i.xval,"D2R"])^2)
+}
+# setting varriable for mean and placing anova
+mse.xval.anew<- mean(s2.xval4,na.rm=T)
+mse.xval.anew
+anova(lm.xval)
+
+
+# setting boot strap
+n.1boot <- 100 # 100 bootstrap resamplings
+
+s2.1boot <- numeric()
+n.obs <- dim(d2r.34852)[1] # number of observation (data points)
+s2.xval4<-numeric()
+for ( i.boot in 1:n.1boot ) {
+  ALL.exprs.train <- ALL.exprs[,xval.grps!=i.xval]
+  # corresponding design matrix must have entries only for the data points (D2R values) that were selected into the training set
+  design.matrix.train <- design.matrix[xval.grps!=i.xval,]
+  # fit all genes agains D2R (12K models!!!)
+  d2r.fit.train <- lmFit(ALL.exprs.train,design.matrix.train)
+  # save best gene from current run
+  all.best.xval.genes <- rownames( topTable( eBayes(d2r.fit.train),"days2remiss") )[1]
+  # cat(all.best.xval.genes," ",fill=i.xval==n.xval)
+  # build the data frame that contains the expression values of the best gene we just
+  tmp.df <- data.frame(G=ALL.exprs[all.best.xval.genes,],D2R=days2remiss)
+  train.1idx <- sample(n.obs,replace=T) # indexes for training set
+ # test set=indices not used in training set:
+  test.1idx <- (1:n.obs)[!(1:n.obs)%in%train.1idx]
+  train.1df <- tmp.df[train.1idx,] # select training data
+  test.1df <- tmp.df[test.1idx,] # select test data
+  lm.1boot <- lm(D2R~G,train.1df) # fit model on training set
+  test.1pred <- predict(lm.1boot,test.1df) # predict on test set
+  s2.1boot <- c(s2.1boot,(test.1pred-test.1df$D2R)^2)
+}
+
+# setting variable for mean and anova
+mse1.boot <- mean(s2.1boot,na.rm=T)
+mse1.boot
+anova(lm.1boot)
+
+# setting table and boxplot
+boxplot(mse1.boot,mse.xval4,mse.xval.anew)
+table(tmp.df$G)
+
+
+```
+
+
+4. (20) Analyze impact of the putative outlier - the datapoint with the lowest days-to-remission value – upon the predictive accuracy of the model. Obtain cross-validation estimates of the model performance fit on the dataset with this datapoint removed, compare it with predictive accuracy estimates obtained for the model developed for the entire dataset. Use procedure similar to problems 2 and 3: re-run 5-fold cross-validation multiple times in order to collect a number of MSE estimates with and without the outlier data point. Draw a boxplot comparing the distributions of the two MSE estimates. In this problem you do not have to select correct most significant gene for each re-run of the cross-validation. We are concerned with the effect of the outlier, so you can use the same most significant gene (as we did in Part 1), just fit new model for it in each training set generated.
+```{r,error=TRUE }
+# setting variable
+library(ALL)
+library(limma)
+
+days2remiss <- as.numeric(date.cr.t - diag.t)
+exprs.tmp <- exprs(ALL)[,!is.na(days2remiss)]
+days2remiss <- days2remiss[!is.na(days2remiss)]
+design.matrix <- cbind(rep(1,length(days2remiss)),days2remiss)
+
+days2remiss <- as.numeric(date.cr.t - diag.t)
+ALL.exprs <- exprs(ALL)[,!is.na(days2remiss)]
+days2remiss <- days2remiss[!is.na(days2remiss)]
+design.matrix <- cbind(rep(1,length(days2remiss)),days2remiss)
+
+# setting cross validation for simulation
+all.best.xval.genes<- # character object to save best gene
+mse.xval.anew<-numeric() # numeric vector to save mean sq. error
+n.sim<-100
+n.xval<-5
+mse.xval4<-numeric()
+##### rerun 5x crossval n.sim times (100, defined in previous problem) ####
+for ( i.sim in 1:n.sim ) {
+  for ( i.xval in 1:n.xval ) { # for each group:
+    # set group i aside as ‘test set’
+    test.df <- d2r.34852[xval.grps==i.xval,]
+    train.df <- d2r.34852[xval.grps!=i.xval,] # the rest is “training”
+    lm.xval <- lm(D2R~G,train.df) # fit the model on the training set
+    test.pred <- predict(lm.xval,test.df) # predict on test set
+    s2.xval3 <- c(s2.xval,(test.pred-test.df$D2R)^2)
+    }
+  # setting variable
+  mse.xval4[i.sim] <- mean(s2.xval3,na.rm=T)
+}
+mse.xval4
+# for the current re-reun of 5x crossval, split the data into 5 groups, randomly
+
+#### run 5 crossvals ####
+#########################
+s2.xval3 <- numeric()
+for ( i.xval in 1:n.xval ) {
+  # training expression values for all genes
+  ALL.exprs.train <- ALL.exprs[,xval.grps!=i.xval]
+  # corresponding design matrix must have entries only for the data points (D2R values) that were selected into the training set
+  design.matrix.train <- design.matrix[xval.grps!=i.xval,]
+  # fit all genes agains D2R (12K models!!!)
+  d2r.fit.train <- lmFit(ALL.exprs.train,design.matrix.train)
+  # save best gene from current run
+  all.best.xval.genes <- rownames( topTable( eBayes(d2r.fit.train),"days2remiss") )[1]
+  # cat(all.best.xval.genes," ",fill=i.xval==n.xval)
+  # build the data frame that contains the expression values of the best gene we just
+  tmp.df <- data.frame(G=ALL.exprs[all.best.xval.genes,],D2R=days2remiss)
+  tmp.df<-tmp.df[-min(tmp.df),]
+  # selected and D2R values; select from it values (patients) that fell into either the
+  lm.xval <- lm(D2R~G,tmp.df[xval.grps!=i.xval,])
+  # predict on the test set and save the squared errors. This part is the same as in
+  test.pred <- predict(lm.xval,tmp.df[xval.grps==i.xval,])
+  # problem 2, except that the best gene was calculated for this particular training set:
+  s2.xval4 <- c(s2.xval4,(test.pred- tmp.df[xval.grps==i.xval,"D2R"])^2)
+}
+# setting variable
+mse.xval.anew<- mean(s2.xval4,na.rm=T)
+mse.xval.anew
+
+
+
+# setting bootstrap
+n.1boot <- 100 # 100 bootstrap resamplings
+
+s2.1boot <- numeric()
+n.obs <- dim(d2r.34852)[1] # number of observation (data points)
+for ( i.boot in 1:n.1boot ) {
+  ALL.exprs.train <- ALL.exprs[,xval.grps!=i.xval]
+  # corresponding design matrix must have entries only for the data points (D2R values) that were selected into the training set
+  design.matrix.train <- design.matrix[xval.grps!=i.xval,]
+  # fit all genes agains D2R (12K models!!!)
+  d2r.fit.train <- lmFit(ALL.exprs.train,design.matrix.train)
+  # save best gene from current run
+  all.best.xval.genes <- rownames( topTable( eBayes(d2r.fit.train),"days2remiss") )[1]
+  # cat(all.best.xval.genes," ",fill=i.xval==n.xval)
+  # build the data frame that contains the expression values of the best gene we just
+  tmp.df <- data.frame(G=ALL.exprs[all.best.xval.genes,],D2R=days2remiss)
+  tmp.df<-tmp.df[-min(tmp.df),]
+  train.1idx <- sample(n.obs,replace=T) # indexes for training set
+ # test set=indices not used in training set:
+  test.1idx <- (1:n.obs)[!(1:n.obs)%in%train.1idx]
+  train.1df <- tmp.df[train.1idx,] # select training data
+  test.1df <- tmp.df[test.1idx,] # select test data
+  lm.1boot <- lm(D2R~G,train.1df) # fit model on training set
+  test.1pred <- predict(lm.1boot,test.1df) # predict on test set
+  s2.1boot <- c(s2.1boot,(test.1pred-test.1df$D2R)^2)
+}
+# setting variable
+mse1.boot <- mean(s2.1boot,na.rm=T)
+mse1.boot
+# boxplot
+boxplot(mse1.boot,mse.xval.anew,mse.xval4)
+```
+
+
+5. (20) Using cross-validation and bootstrap assess predictive accuracy of twogene model using two genes most significantly associated with the response. Compare it with the assessment of the one-gene model obtained above.Namely, rerun the same code as in problem 2 (multiple repeats of five-fold, cross-validation and, say, n=100 bootstrap) but the model now is D2R~G1+G3. Select most significant genes every time anew. Make sure you use correct design table if you use lmFit(). Generate N.rep estimates for MSE in cross-validation and bootstrap reruns, just like in Problems 2,3 and draw a boxplot comparing the distributions of MSE in reruns in problem 2 (single gene, cross-validation and n=100 bootstrap) and MSE obtained in this 
+problem with two-gene model.
+```{r,error=TRUE }
+# setting variable and call libraru
+library(ALL)
+data(ALL)
+ALL.pdat <- pData(ALL)
+date.cr.chr <- as.character(ALL.pdat$date.cr)
+diag.chr <- as.character(ALL.pdat$diagnosis)
+date.cr.t <- strptime(date.cr.chr,"%m/%d/%Y")
+diag.t <- strptime(diag.chr,"%m/%d/%Y")
+days2remiss <- as.numeric(date.cr.t - diag.t)
+x.d2r <- as.numeric(days2remiss)
+exprs.34852 <- exprs(ALL)["34852_g_at",]
+d2r.34852 <- data.frame(G=exprs.34852,D2R=x.d2r)
+d2r.34852<-na.omit(d2r.34852)
+exprs.35296 <- exprs(ALL)["35296_at",]; 
+exprs.1213 <- exprs(ALL)["1213_at",]
+g3.df <- data.frame(D2R=x.d2r,G1=exprs.34852,G2=exprs.35296,G3=exprs.1213)
+g3.df <- g3.df[!is.na(g3.df$D2R),]
+
+n.sim<-1000 # Object for the number of times we want to rerun the whole procedure (crossval or boot) (1000)
+n.xval<-5 # Object for the number of crossvalidations (we want 5x crossval)
+xval.grps <- sample(1:dim(g3.df)[1]%%n.xval+1)
+
+mse.xval<- numeric() # Create numeric object to save MSEs for crossval here
+n.boot<-c(10,100,1000)
+# Create list Object to save MSEs for 3 boots (10, 100, 1000)
+s2.boot <- numeric()
+s2.boot2 <-numeric()
+s2.boot3<-numeric()
+
+mse1.boot<-numeric()
+mse2.boot<-numeric()
+mse3.boot<-numeric()
+n.obs <- dim(g3.df)[1] # number of observation (data points)
+# we run a single loop here, n.sim times, in which we rerun both 5x crossval and boots
+for ( i.sim in 1:n.sim ) {
+# rerun the whole 5x-crossval and boot multiple times:
+# split data randomly into 5 groups for the current rerun of 5x crossval:
+  for ( i.boot in 1:n.boot ) {
+    train.idx <- sample(n.obs,replace=T) # indexes for training set
+ # test set=indices not used in training set:
+    test.idx <- (1:n.obs)[!(1:n.obs)%in%train.idx]
+    train.df <- g3.df[train.idx,] # select training data
+    test.df <- g3.df[test.idx,] # select test data
+    lm.boot <- lm(D2R~G1,train.df)# fit model on training set
+    lm2.boot <- lm(D2R~G1+G2,train.df)
+    lm3.boot <- lm(D2R~G1+G3,train.df)
+    test.pred <- predict(lm.boot,test.df) # predict on test set
+    test.pred2 <- predict(lm2.boot,test.df)
+    test.pred3 <- predict(lm3.boot,test.df)
+    s2.boot <- c(s2.boot,(test.pred-test.df$D2R)^2)
+    s2.boot2 <- c(s2.boot2,(test.pred2-test.df$D2R)^2)
+    s2.boot3 <- c(s2.boot3,(test.pred3-test.df$D2R)^2)
+    }
+  # setting variable
+  mse1.boot[i.sim] <- mean(s2.boot,na.rm=T)
+  mse2.boot[i.sim] <- mean(s2.boot2,na.rm=T)
+  mse3.boot[i.sim] <- mean(s2.boot3,na.rm=T)
+
+}
+
+mse1.boot
+mse2.boot
+mse3.boot
+
+# anova and summary for each lm
+summary(lm.boot)
+anova(lm.boot)
+summary(lm2.boot)
+anova(lm2.boot)
+summary(lm3.boot)
+anova(lm3.boot)
+
+n.xval <- 5 # number of groups to split data into
+# generate and permute group labels (i.e. assign 
+# datapoints to groups 1..5 randomly):
+val.grps <- sample(1:dim(g3.df)[1]%%n.xval+1)
+s2.xval <- numeric()
+for ( i.xval in 1:n.xval ) { # for each group:
+ # set group i aside as ‘test set’
+ test.df <- g3.df[xval.grps==i.xval,]
+ train.df <- g3.df[xval.grps!=i.xval,] # the rest is “training”
+ lm.xval <- lm(D2R~G1,train.df) # fit the model on the training set
+ lm.xval2 <- lm(D2R~G1+G2,train.df)
+ lm.xval3 <- lm(D2R~G1+G3,train.df)
+ test.pred <- predict(lm.xval,test.df) # predict on test set
+ test.pred2 <- predict(lm.xval2,test.df)
+ test.pred3 <- predict(lm.xval3,test.df)
+ 
+ s2.xval <- c(s2.xval,(test.pred-test.df$D2R)^2)
+ s2.xval2 <- c(s2.xval2,(test.pred2-test.df$D2R)^2)
+ s2.xval3 <- c(s2.xval3,(test.pred3-test.df$D2R)^2)
+}
+# setting variable
+mse1.xval <- mean(s2.xval,na.rm=T)
+mse2.xval <- mean(s2.xval2,na.rm=T)
+mse3.xval <- mean(s2.xval3,na.rm=T)
+
+mse1.xval
+mse2.xval
+mse3.xval
+# anova and summary for each lm
+
+summary(lm.xval)
+anova(lm.xval)
+summary(lm.xval2)
+anova(lm.xval2)
+summary(lm.xval3)
+anova(lm.xval3)
+
+mse.boot1<-numeric()
+mse.boot2<-numeric()
+mse.boot3<-numeric()
+n2.boot<-c(10,100,1000)
+for ( n.boot in n2.boot) {
+  s2.boot <- numeric()
+  s2.boot2 <- numeric()
+  s2.boot3 <- numeric()
+  n.obs <- dim(g3.df)[1]
+  for ( i.boot in 1:n.boot ) {
+    test.idx <- (1:n.obs)[!(1:n.obs)%in%train.idx]
+    train.df <- g3.df[train.idx,] # select training data
+    test.df <- g3.df[test.idx,] # select test data
+    lm.boot <- lm(D2R~G1,train.df) # fit model on training set
+    lm.boot2 <- lm(D2R~G1+G2,train.df)
+    lm.boot3 <- lm(D2R~G1+G3,train.df)
+    test.pred <- predict(lm.boot,test.df) # predict on test set
+    test.pred2 <- predict(lm.boot2,test.df)
+    test.pred3 <- predict(lm.boot3,test.df)
+    s2.boot <- c(s2.boot,(test.pred-test.df$D2R)^2)
+    s2.boot2 <- c(s2.boot2,(test.pred2-test.df$D2R)^2)
+    s2.boot3 <- c(s2.boot3,(test.pred3-test.df$D2R)^2)
+  }
+  # setting variable
+  mse.boot1[n.boot] <- mean(s2.boot,na.rm=T)
+  mse.boot2[n.boot] <- mean(s2.boot2,na.rm=T)
+  mse.boot3[n.boot] <- mean(s2.boot3,na.rm=T)
+  
+}
+
+mse.boot1
+mse.boot2
+mse.boot3
+
+# summary and anova of each lm
+summary(lm.boot)
+anova(lm.boot)
+summary(lm.boot2)
+anova(lm.boot2)
+summary(lm.boot3)
+anova(lm.boot3)
+
+# creating simulation cross validation
+n.xval <- 5 # number of groups to split data into
+# generate and permute group labels (i.e. assign 
+# datapoints to groups 1..5 randomly):
+val.grps <- sample(1:dim(g3.df)[1]%%n.xval+1)
+s2.xval <- numeric()
+mse.xval<- numeric()
+mse.xval2<- numeric()
+mse.xval3<- numeric()
+for ( i.sim in 1:n.sim ) {
+  for ( i.xval in 1:n.xval ) { # for each group:
+    # set group i aside as ‘test set’
+    test.df <- g3.df[xval.grps==i.xval,]
+    train.df <- g3.df[xval.grps!=i.xval,] # the rest is “training”
+    lm.xval <- lm(D2R~G1,train.df) # fit the model on the training set
+    lm2.xval <- lm(D2R~G1+G2,train.df)
+    lm3.xval <- lm(D2R~G1+G3,train.df)
+    test.pred <- predict(lm.xval,test.df) # predict on test set
+    test.pred2 <- predict(lm2.xval,test.df)
+    test.pred3 <- predict(lm3.xval,test.df) 
+    s2.xval <- c(s2.xval,(test.pred-test.df$D2R)^2)
+    s2.xval2 <- c(s2.xval,(test.pred2-test.df$D2R)^2)
+    s2.xval3 <- c(s2.xval,(test.pred3-test.df$D2R)^2)
+    }
+  # setting variable
+  mse.xval[i.sim] <- mean(s2.xval,na.rm=T)
+  mse.xval2[i.sim] <- mean(s2.xval2,na.rm=T)
+  mse.xval3[i.sim] <- mean(s2.xval3,na.rm=T)
+}
+mse.xval
+mse.xval2
+mse.xval3
+
+# summary and anova of each lm
+summary(lm.xval)
+anova(lm.xval)
+
+summary(lm.xval2)
+anova(lm.xval2)
+
+summary(lm.xval3)
+anova(lm.xval3)
+
+# boxplot of values
+boxplot(mse.xval,mse.xval2,mse.xval3,mse.boot1,mse.boot2,mse.boot3,mse1.xval,mse2.xval,mse3.xval,mse1.boot,mse2.boot,mse3.boot)
+
+
+```

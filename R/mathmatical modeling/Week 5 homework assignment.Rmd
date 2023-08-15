@@ -1,0 +1,306 @@
+---
+title: "Week 5 homework"
+author: "Christopher Tran"
+date: "2/9/2022"
+output: html_document
+---
+
+1. (20) Among many models built in the Notes, we have fitted the binary metastasis/no metastasis outcome variable using logistic regression on a single gene expression variable or on 20 gene expression variables (using the genes most significant in t-test in both cases). Fit the logistic regression model to the same outcome data using two most significant genes. Assess the quality of the fit using the same metrics we used in class. Did we get any improvement in the fit by fitting against two variables instead of just one? Additionally, calculate the correlation coefficient between the expression levels of these two most significant genes; comment on the results. 
+
+
+```{r, error=TRUE}
+# calling libraries and setting variables
+library(breastCancerNKI)
+suppressPackageStartupMessages(library(Biobase))
+library(e1071)
+data(nki)
+class(nki)
+dim(nki)
+
+ge=exprs(nki) 
+t.m = pData(nki)$t.rfs 
+e.m = pData(nki)$e.rfs
+er.m= pData(nki)$er
+n.m=pData(nki)$node
+
+# setting recurance and cut off
+
+T = 3000 
+sample.sel = ! is.na(t.m) & ( t.m >= T | t.m < T & e.m == 1 ) 
+
+# setting genes
+ge = ge[,sample.sel]
+e.m = e.m[sample.sel]
+
+
+# setting factor
+e.m=factor(e.m,levels=c(0,1)) # convert to a factor
+# setting pvalue
+tt.pvals=apply(ge,1,function(x) t.test( x ~ e.m )$p.value )
+
+
+a<-ge[which.min(tt.pvals),]
+# which.min( a[a!=which.min(tt.pvals)] )
+
+# calculating logistic regression 
+M=glm(e.m ~ ge[which.min(tt.pvals),],family="binomial")
+predict(M,type="response")[1:5]
+as.numeric(predict(M,type="response")[1:5]>0.5)
+
+M1=glm(e.m ~ ge[which.min(tt.pvals),]+ge[which.min(tt.pvals[ge!=(a)]),],family="binomial")
+predict(M1,type="response")[1:5]
+as.numeric(predict(M1,type="response")[1:5]>0.5)
+
+
+# performing prediction
+assess.prediction=function(truth,predicted) {
+ predicted = predicted[ ! is.na(truth) ]
+ truth = truth[ ! is.na(truth) ]
+ truth = truth[ ! is.na(predicted) ]
+ predicted = predicted[ ! is.na(predicted) ]
+ cat("Total cases that are not NA: ",length(truth),"\n",sep="") 
+ cat("Correct predictions (accuracy): ",sum(truth==predicted),
+ "(",signif(sum(truth==predicted)*100/length(truth),3),"%)\n",sep="")
+
+ TP = sum(truth==1 & predicted==1)
+ TN = sum(truth==0 & predicted==0)
+ FP = sum(truth==0 & predicted==1)
+ FN = sum(truth==1 & predicted==0)
+ P = TP+FN 
+ N = FP+TN 
+ cat("TPR (sensitivity)=TP/P: ", signif(100*TP/P,3),"%\n",sep="")
+ cat("TNR (specificity)=TN/N: ", signif(100*TN/N,3),"%\n",sep="")
+ cat("PPV (precision)=TP/(TP+FP): ", signif(100*TP/(TP+FP),3),"%\n",sep="")
+ cat("FDR (false discovery)=1-PPV: ", signif(100*FP/(TP+FP),3),"%\n",sep="")
+ cat("FPR =FP/N=1-TNR: ", signif(100*FP/N,3),"%\n",sep="")
+}
+# predictions for each logistic regression
+assess.prediction(e.m,as.numeric(predict(M,type="response")>0.5))
+assess.prediction(e.m,as.numeric(predict(M1,type="response")>0.5))
+
+# more aggressive predictions:
+assess.prediction(e.m,as.numeric(predict(M,type="response")>0.3))
+assess.prediction(e.m,as.numeric(predict(M1,type="response")>0.3))
+
+
+#setting and ordering data frame
+df=as.data.frame(t(ge[order(tt.pvals),]))
+df1<-as.data.frame(t(ge[which.min(tt.pvals[ge!=(a)]),]))
+
+# run logistic regression on first 20 most significant genes. 
+M2=glm(e.m ~ . , data=df[1:20], family="binomial",na.action="na.exclude")
+assess.prediction(e.m,as.numeric(predict(M2,type="response")>0.5))
+M3=glm(e.m ~ . , data=df[1:2], family="binomial",na.action="na.exclude")
+assess.prediction(e.m,as.numeric(predict(M2,type="response")>0.5))
+
+# correlation test
+cor.test(df[,1],df[,2])
+
+# cor.test(df1[,1],df1[,2],method="pearson")
+
+# summary of models
+summary(M)
+summary(M1)
+summary(M2)
+summary(M3)
+
+```
+When we added our gene, we saw a significant improvement. It went from 69% to 80%. Our correlation test can confirm this as it is close to 1. 
+
+
+2. (40) In the Notes we jumped onto fitting the outcome variable against gene expression levels. Certainly it is very interesting to see how the recurrence of metastatic disease over pretty long term can be potentially forecasted at molecular level, just from gene expression levels. But it is not very wise to leave out a wealth of clinical information available. Consider the following clinical variables (all available in the pData(nki) table): tumor size, tumor grade, involvement of lymph nodes (0/1=no/yes in the simplified phenotype data table compiled for our dataset), estrogen receptor (ER) status (1=er positive). 
+
+a. Fit a logistic regression model just on these clinical variables against the same outcome we used in the notes (recurrence within 8 years). Assess the quality of the fit in terms of the classification accuracy (use the function from the Notes), compare the results to what we obtained with logistic regression models build on gene expression values only, comment on your findings.
+
+b. Fit a logistic regression model for the same outcome on clinical variables and a few top genes (say, 10). Assess the classification metrics and comment on your findings: does the fit improve further? How does it compare to expression-only or clinical-only models? 
+
+NOTE 1: clinical variables grade, node, and ER are categorical; you will have to explicitly convert them into factors, otherwise R will think you are fitting against continuous numeric variables;
+
+NOTE 2: do not forget that we chose to work only with subjects that were not censored before the cutoff time; if you are going to reuse the code from the Notes, also remember that we already dropped censored samples from e.m and g.e – make sure the new variables you pull from pData(nki) are synchronized one-to-one to those data objects.
+
+```{r, error=TRUE}
+# a
+
+# calling libraries and setting variables
+library(breastCancerNKI)
+suppressPackageStartupMessages(library(Biobase))
+library(e1071)
+data(nki)
+class(nki)
+dim(nki)
+
+ge=exprs(nki)
+c=pData(nki)
+f=fData(nki)
+
+t.m = pData(nki)$t.rfs 
+e.m = pData(nki)$e.rfs
+er.m= pData(nki)$er
+n.m= pData(nki)$node
+g.m=pData(nki)$grade
+s.m=pData(nki)$size
+
+
+# setting recurance and cut off
+T = 3000 
+sample.sel = ! is.na(t.m) & ( t.m >= T | t.m < T & e.m == 1 ) 
+
+# setting genes
+gee = ge[,sample.sel]
+e.me = e.m[sample.sel]
+s.erm<-er.m[sample.sel]
+s.nm<-n.m[sample.sel]
+s.gm<-g.m[sample.sel]
+s.sm<-s.m[sample.sel]
+
+# setting factor
+e.mf=factor(e.me,levels=c(0,1)) 
+s.ermf=factor(s.erm,levels=c(0,1))
+s.nmf=factor(s.nm,levels=c(0,1))
+s.gmf=factor(s.gm,levels=c(1,2,3))
+s.smf=factor(s.sm,levels=c(0,1))
+
+# setting pvalue
+tt.pvals=apply(gee,1,function(x) t.test( x ~ e.mf )$p.value )
+
+
+# performing prediction
+assess.prediction=function(truth,predicted) {
+ predicted = predicted[ ! is.na(truth) ]
+ truth = truth[ ! is.na(truth) ]
+ truth = truth[ ! is.na(predicted) ]
+ predicted = predicted[ ! is.na(predicted) ]
+ cat("Total cases that are not NA: ",length(truth),"\n",sep="") 
+ cat("Correct predictions (accuracy): ",sum(truth==predicted),
+ "(",signif(sum(truth==predicted)*100/length(truth),3),"%)\n",sep="")
+ TP = sum(truth==1 & predicted==1)
+ TN = sum(truth==0 & predicted==0)
+ FP = sum(truth==0 & predicted==1)
+ FN = sum(truth==1 & predicted==0)
+ P = TP+FN 
+ N = FP+TN 
+ cat("TPR (sensitivity)=TP/P: ", signif(100*TP/P,3),"%\n",sep="")
+ cat("TNR (specificity)=TN/N: ", signif(100*TN/N,3),"%\n",sep="")
+ cat("PPV (precision)=TP/(TP+FP): ", signif(100*TP/(TP+FP),3),"%\n",sep="")
+ cat("FDR (false discovery)=1-PPV: ", signif(100*FP/(TP+FP),3),"%\n",sep="")
+ cat("FPR =FP/N=1-TNR: ", signif(100*FP/N,3),"%\n",sep="")
+}
+
+#setting and ordering data frame
+df=as.data.frame(t(gee[order(tt.pvals),]))
+
+# setting logistic models
+M.em=glm(e.mf ~ . , data=df[1:20], family="binomial",na.action="na.exclude")
+assess.prediction(e.mf,as.numeric(predict(M.em,type="response")>0.5))
+
+M.1=glm(e.mf ~ s.ermf+s.nmf+s.gmf+s.sm, family="binomial",na.action="na.exclude")
+assess.prediction(e.mf ,as.numeric(predict(M.1,type="response")>0.5))
+
+
+# b
+# setting logistic models
+M.er=glm(s.ermf ~ . , data=df[1:10], family="binomial",na.action="na.exclude")
+assess.prediction(s.ermf,as.numeric(predict(M.er,type="response")>0.5))
+
+M.n=glm(s.nmf ~ . , data=df[1:10], family="binomial",na.action="na.exclude")
+assess.prediction(s.nmf,as.numeric(predict(M.n,type="response")>0.5))
+
+M.g=glm(s.gmf ~ . , data=df[1:10], family="binomial",na.action="na.exclude")
+assess.prediction(s.gmf,as.numeric(predict(M.g,type="response")>0.5))
+
+M.s=glm(s.smf ~ . , data=df[1:10], family="binomial",na.action="na.exclude")
+assess.prediction(s.smf ,as.numeric(predict(M.s,type="response")>0.5))
+
+M.em=glm(e.mf ~ . , data=df[1:10], family="binomial",na.action="na.exclude")
+assess.prediction(e.mf,as.numeric(predict(M.em,type="response")>0.5))
+
+M.2=glm(e.mf ~ .+s.ermf+s.nmf+s.gmf+s.sm,data=df[1:10], family="binomial",na.action="na.exclude")
+assess.prediction(e.mf ,as.numeric(predict(M.2,type="response")>0.5))
+
+```
+
+
+
+The original data was using the top 20 genes. In the homework we onyl perform a logistic regression with just the clinical variables and top 10 genes. we see an increase as the top genes are added. I think this is something that we are looking for as more genes are added to our regression.
+
+3. (40) Reuse (or rewrite) the simple leave-n-out code we started developing in the Notes to correctly assess the prediction accuracy of the logistic regression and naïve Bayes classifiers. Assess the following models (all used in the Notes):
+
+a. Logistic regression with one top gene
+b. Logistic regression with 20 top genes 
+c. Naïve Bayes with one top gene
+d. Naïve Bayes with 20 top genes
+e. Logistic regression with clinical variables only
+f. Logistic regression with clinical variables and 10 top genes
+Compare the results and comment on them.
+
+```{r, error=TRUE}
+# calling libraries and setting variables
+library(breastCancerNKI)
+suppressPackageStartupMessages(library(Biobase))
+library(e1071)
+library(class)
+data(nki)
+ge=exprs(nki)
+e.m = pData(nki)$e.rfs
+
+# setting genes
+ge = ge[,sample.sel]
+e.m = e.m[sample.sel]
+
+# setting factor
+e.m=factor(e.m,levels=c(0,1)) 
+
+# setting pvalue
+tt.pvals=apply(ge,1,function(x) t.test( x ~ e.m )$p.value )
+
+#setting and ordering data frame
+df=as.data.frame(t(ge[order(tt.pvals),]))
+
+# setting df
+df1=df[1]
+df20=df[1:20]
+
+df.1=data.frame(G=df[,1])
+df.20=df[,1:20]
+
+dfc=cbind(s.erm,s.nm,s.gm,s.sm)
+dfc.10=df[,1:10]
+
+# setting variable
+n = 0
+n.out = 5
+Nrep = 1000
+
+# setting function 
+l.o<-function(x){
+       for ( i in 1:Nrep ) {
+               leave.out = sample(nrow(x),size=n.out)
+               pred = knn(x[-leave.out,1,drop=F],x[leave.out,1,drop=F],e.m[-leave.out],k=1)
+               n = n + sum( pred==e.m[leave.out] )
+       }
+       n/(n.out*Nrep) 
+}
+
+# performing leave-n-out function for required dfs
+# a
+l.o(df1)
+
+# b
+l.o(df20)
+
+# c
+l.o(df.1)
+
+# d
+
+l.o(df.20)
+
+# e
+l.o(dfc)
+
+# f
+l.o(dfc.10+dfc)
+```
+
+Looking at each required leave out method, we know the difference is when the top genes are added. Looking at the values, we see an increase when the top genes are added to the df. This goes to show that the more of the top values are added, the higher ur value for a leave-n-out function.
+

@@ -1,0 +1,153 @@
+---
+title: "homework assignment 3"
+author: "Christopher Tran"
+date: "10/19/2021"
+output: word_document
+---
+1. (40) Linear models are not necessarily linear with respect to their random variable arguments! Simulate small dataset with two dependent variables x,y, and with built-in linear and quadratic terms in the dependency of y on x. Make sure you build the dependency in statistical sense, e.g. there is some noise in the data. Fit to these data models with 1) intercept, 2) intercept and slope, 3) intercept, slope and curvature (quadratic term x^2). Assess the performance of these models when fitting your dataset (Hints: x=1:20; y=20+10*1:20+5*(1:20)^2+ rnorm(20,0,200) would simulate such dataset; fit a model on such pair of variables– see how well it fits, how well it recovers the "true" parameters you built your simulated data with, try modifying the model as in 1)-->2)-->3) above, also assess effects of changing variance of the error term you built in into x,y).
+
+```{r 1) intercept, 2) intercept and slope, 3) intercept, slope and curvature (quadratic term x^2)}
+# set variables
+x<- 1:20
+y<-20+10*1:20+5*(1:20)^2+ rnorm(20,0,200)
+# variables for intercept
+s<-lm(y~1)
+pres<-(predict(s))
+# varibales for intercept and slope
+si<-lm(y~x)
+presi<-(predict(si))
+# variables for intercept,slope, and curvature
+si2<-lm(y~x+I(x^2))
+presi2<-predict(si2)
+
+# plot graph
+plot(x,y,main="original plot of x and y")
+lines(pres,col="purple")
+lines(presi,col="green")
+lines(presi2,col="blue")
+
+# plot slope
+plot(x,resid(s),main="slope",col="orange")
+abline(h=0,lty=2)
+# plot intercept and slope
+plot(x,resid(si),main="intercept and slope",col="red")
+abline(h=0,lty=2)
+# plot intercept,slope,curvature
+plot(x,resid(si2),main="intercept, slope, and curvature",col="brown")
+abline(h=0,lty=2)
+
+
+```
+Looking at the graphs, we see a difference within each line. The first is a line of regression that is going by are suggest values of plots and creating our line. The other two lines are predicted using the other suggested values that was given. Looking at the other 3 graphs, we can see how they line of regression forms but looking at the original one we have. This gives and shows us how the regression works due to the circumstances. 
+
+2. (40) Find genes in ALL with the most and the least significant effect on age – plot distribution of p-values for gene effect on age for all 12K genes, generate diagnostic plots and present model summaries and ANOVA results for the linear models of the two extreme cases – the gene with the most and with the least significant effect on age as assessed by ANOVA. Hint 1: quantify the effect strength by significance, not by the magnitude of the slope; Hint 2:anova is slow, running 12K times may take some time – debug you code on a subset of data, e.g. first 100 rows.
+```{r plot distribution of p-values for gene effect on age for all 12K genes, generate diagnostic plots and present model summaries and ANOVA results for the linear models of the two extreme cases – the gene with the most and with the least significant effect on age as assessed by ANOVA}
+# load libraries and set variables
+library(ALL)
+data(ALL)
+sample<-exprs(ALL)
+age<-ALL$age
+
+# create function for data frame to place x value for anova
+pval <- function(x){
+ padf <- data.frame(samples=x,age=ALL$age)
+ anova(lm(age~samples,padf))["samples","Pr(>F)"]
+}
+
+# apply function and samples in variables
+Spval<-apply(sample,1,pval)
+
+
+# locate and print out gene and min and max of pvalue
+minsp<-Spval[which.min(Spval)]
+maxsp<-Spval[which.max(Spval)]
+print(minsp)
+print(maxsp)
+
+# graph
+hist(Spval,main="Gene effects")
+
+#min and max of p-value
+eminsp<-exprs(ALL)[which.min(Spval),]
+emaxsp<-exprs(ALL)[which.max(Spval),]
+
+
+# create dataframe for min and max
+dminsp<-data.frame(sample=eminsp,age=ALL$age)
+dmaxsp<-data.frame(sample=emaxsp,age=ALL$age)
+
+# create linear model
+dminsplm<-lm(age~sample,dminsp)
+dmaxsplm<-lm(age~sample,dmaxsp)
+print(dminsplm)
+print(dmaxsplm)
+# summary of each linear model
+summary(dminsplm)
+summary(dmaxsplm)
+
+# anova of each linear model
+anova(lmdminsp)
+anova(dminsplm)
+
+# plot of min/max vs age
+plot(dminsp,ALL$age,main="min age")
+plot(dmaxsp,ALL$age,main="max age")
+
+# plot of linear model
+plot(dminsplm)
+plot(dmaxsplm)
+
+
+
+```
+
+3. (20) Draw two samples of size 10 from standard normal distribution, run t-test on them, save p-value – repeat 10K times, plot resulting distribution of p-values, count how many p-values are below 0.05. This is very similar to exercises that were done in lecture notes and homework 2 – the aim is to set the stage and develop your intuition for discussion of multiple test correction, false discovery rate, etc.
+
+```{r }
+# set value
+n1<-20
+n2<-10000
+# variable for rnormal
+sample<-rnorm(n*r)
+# creating matrix
+m<-matrix(sample,ncol =n1, nrow=n2)
+# function for t.test pvalue
+pv <- function(x)t.test(x[1:10],x[11:20])$p.value
+pvalue<-apply(m,2,pv)
+pvalue
+## print/plot pvalue
+# print(pvalue)
+hist(pvalue)
+```
+
+
+4. (Extra 20) Fit linear model of gene expression level effect on time to remission for every gene in ALL dataset, plot (two separate) distributions of resulting ANOVA p-values for gene effects and for Shapiro-Wilk test p-values for the normality of model residuals.
+
+```{r }
+# load library
+library(ALL)
+# set variables
+alld<-pData(ALL)
+date.c<-as.character(alld$date.cr)
+diag.c<- as.character(alld$diagnosis)
+date.t<-strptime(date.c,"%m/%d/%Y")
+diag.t<- strptime(diag.c,"%m/%d/%Y")
+days2mreis<-as.numeric(date.t - diag.t)
+pvala<-0
+pvals<-0
+
+
+# creat loop for every gene in data set for anova and shapiro test for pvalue
+for ( samples in 1:exprs(ALL)[[1]] ) { 
+ dfg <- data.frame(gene=exprs(ALL)[samples,],remission=days2remiss)
+ dfglm <- lm(remission~gene,dfg) 
+ pvala[samples] <- anova(dfglm)["gene","Pr(>F)"] 
+ pvals[samples] <- shapiro.test(resid(dfglm))$p.value
+}
+# plot all values
+plot(pvala,pvals, xlab="anova",ylab="shapiro test")
+hist(pvala,xlab="p-value", main="anova gene effects")
+hist(pvals,xlab="p-value",main="shapiro-wilk test ")
+
+
+```

@@ -1,0 +1,311 @@
+---
+title: "homework 1"
+author: "Christopher Tran"
+date: "10/7/2021"
+output: word_document
+---
+
+##Queston 1
+(25) Using no other R functions besides sqrt (e.g. to calculate sum use a 
+loop summing all elements from first to last) implement function my.sd
+calculating standard deviation for a numeric vector of arbitrary length and 
+demonstrate that it produces exactly the same results as R function sd.
+
+```{r question 1}
+#setting function
+my.sd <- function (x){
+  #setting variable to create average
+  sum<-0
+  num<-0
+  #beginning for loop for average
+  for (y in x){
+    sum<-sum+y
+    num <- num + 1
+  }  
+  ave <- sum/num
+  var <- 0
+  #beginning for loop  to create portion of square root equation
+  for (y in x){
+    var <- var + (y-ave)^2
+  }
+  #standard deviation equation
+  var <- var/(num-1)
+  sqrt(var)
+}
+#created function of standard deviation
+my.sd(2:8)
+#using R built standard deviation to compare
+sd(2:8)
+```
+
+##Queston 2
+(25) Execute and explain the results of the following three pieces of R code. 
+For each of them – start R afresh, copy and paste code in R command prompt.
+Explain in detail what the code does, what is printed (or not printed) and why.
+
+```{r Question 2 Code excerpt #1}
+
+x<-sin(1);print(x);y<-Sin(2);print(y)
+x<-sin(1)
+print(x)
+y<-Sin(2)
+print(y)
+
+```
+The results for this first line code shows that variable are set in this line x equaling to sin(1)  and then prints out (x);y<-Sin(2);print(y) on the R console. The next line again sets the variable same variable x equals sin(1). The line after prints out the variable x which R will compute sin(1) which results in 0.841471. The next line of code is setting another variable which is y equals Sin(2). After the code will print to the console which results in "Error in Sin(2) : could not find function "Sin."" This is due to the fact the function sin has a Capital S. If there was no capital S the results would be 0.9092974. This line of code is showing us how case sensitive R can be when coding.
+
+```{r Question 2 Code excerpt #2}
+m <- matrix(c(1:5,NA,7,7,NA),
+nrow=3,ncol=3,byrow=T)
+print(m)
+for ( i in 1:dim(m)[[1]] ) {
+  mm <- sort(m[i,],na.last=c(NA,NA,T)[[i]])
+  for ( j in 1:(length(mm)-1) ) {
+    if ( mm[[j]]==mm[[j+1]] ) {
+      cat(i,j,mm[[j]],fill=T)
+    }
+  }
+}
+```
+In this line of code, a matrix is set using the variable m. The matrix is has values combined to it using the c() function. What is being combined in the matrix is numbers 1 though 5 (1:5), After that set values will be in place such as NA, 7, 7, and NA. The amount of Rows and columns are 3 which is set by nrow= and ncolumn= and byrow = t means that the matrices are being filled by row. If false, this will be filled by column. The code will then print in the console with the print(m) function which is 3 1 7. A for loop is created next. for 1 in i going through the dimensions of the matrix since we are placing the dim function using the variable m set in the 1st column i believe. the loop was then opened with a {. The variable mm is then being set to sort m variable that was set from before. while setting this variable, the na.last is sorting the NA values at the end.As we continue another loop is created for the 1 in j to  the length of mm variable.In the next line of code, an error has popped up stating in the r console "Error in if (mm[[j]] == mm[[j + 1]]) { : missing value where TRUE/FALSE needed." Since an error has occurred here, the last few lines of coding was not performed.I think this may have to do with the NA values in the matrices. Since NA is not a numerical value,  I think this is confusing R what to do. A line of code needs to be set, I would think something like a true false statement as R indicated to inform R to proceed forward with the NA values. I believe if this code were to continune the concatenate function will print out the loops in i, j, mm set in j for this last part of the code. Afterwards, The loop was completed to end the code. 
+
+```{r Question 2 Code excerpt #3 check the docs for “matrix” multiplication operator %*%; how does it differ from ‘*’? R will not parse ?%*%, but you can run help(“%*%”) or simply ?”%*%”}
+1:3 * 5:7
+1:3 %*% 5:7
+1:3 %*% t(5:7)
+
+?"%*%"
+?t()
+
+```
+Using the ?"%*%" and ?t(), I was able to understand the amount of coding that was produced above. The first part in this code is multiplying the numbers 1,2,3 * 5,6,7. How R reads these numbers in sequential order (1:3 would equal 1,2,3.) with in this case multiplication would be 1*5, 2*6 and 3*7. The results from this code is given in R  5 12 21. With the next set of code, we have the same sequential numbers, but using a matrix multiplication instead. This multiplies two matrices. In this case we are looking at a sequence of equal length. When the they are the same length, it will return the inner product as a matrix. In this case the inner product of this matrix is 38. The last code is addes a function to the end which is a matrix transpose. What this does is transposes the information and puts it into a matrix. 
+
+##Queston 3 
+(25)Practice dataset import/export
+
+```{r Question 3a Load into R dataset “aaMap” (available in Biobase), determine and describe data type of each column. }
+#load library
+library(Biobase)
+#load data set from biobase
+data(aaMap)
+#show data set is in global environment
+ls()
+#print in console
+print (aaMap)
+```
+
+```{r Question 3b Store, remove and recover it using save and load functions (use the help command ‘?’ and read documentation), demonstrate its removal and recovery, using ls function}
+
+#show global environment
+ls()
+#save aaMap file within R
+save(aaMap,file="aaMap.txt")
+#remove aaMAP from global environment
+rm(aaMap)
+#show global environment
+ls()
+#reload global environment using file
+load('aaMap.txt')
+#Show global environment
+ls()
+#print in console
+print(aaMap)
+```
+
+```{r Question 3c Save it in a file using write.table function}
+#write table
+write.table(aaMap, "aaMAPtable.txt")
+#set variable to read table
+aaMap<-read.table("aaMAPtable.txt")
+#print in console
+print(aaMap)
+```
+
+```{r Question 3d Open the file using text editor, add a column describing amino acid side chain charge at pH=7 (you can use http://en.wikipedia.org/wiki/Amino_acid in order to get neutral/positive/negative charge annotations, or you can even come up with some random numbers, this exercise is about modifying the data and loading them back, not about amino acids), save file, import it back into R, demonstrate that column was added to the data frame}
+
+#create variable to read table
+charge <-read.table("charge.txt",sep="\t", header=T)
+#print to confirm file
+print(charge)
+#adding new column from charge.txt file
+ntable<-cbind(aaMap,charge$charge)
+#write table 
+write.table(ntable,"newaaMap.txt")
+#read table
+ctable<-read.table("newaaMap.txt")
+
+#print to console
+print(ntable)
+print(ctable)
+
+
+
+```
+
+
+
+##Question 4
+(25) Calculate and visualize some basic properties of gene expression levels 
+in ALL dataset. Remember that function exprs returns a matrix of gene 
+expression levels (~13K genes) for each patient (>100 patients) in the sample.
+
+
+```{r Question 4a. Calculate average gene expression level for each patient. Plot them using the following visualizations:}
+library(ALL)
+data(ALL)
+# i. Histogram
+data <- exprs(ALL)
+pmean <- apply(data,2,mean)
+hist(pmean)
+# ii. Boxplot
+boxplot(pmean)
+# iii. Stripchart
+stripchart((pmean))
+# iv. Stem-and-leaf
+stem(pmean)
+# v. Dotchart
+dotchart(pmean)
+# vi. Sorted in ascending order
+plot(sort(pmean))
+```
+
+```{r Question 4b. Calculate average gene expression levels for each gene. Plot them: }
+gmean<-apply(data,1,mean)
+# i. Histogram
+hist(gmean)
+# ii. Boxplot
+boxplot(gmean)
+# iii. sorted in the ascending order
+plot(sort(gmean))
+```
+
+```{r Question 4c. For average gene expression per patient calculate the following measures of center and spread – explain results obtained:}
+# i. Mean
+mean(pmean)
+# ii. Median
+median(pmean)
+# iii. Standard deviation (sd)
+sd(pmean)
+# iv. Median absolute deviation (mad)
+mad(pmean)
+# v. Interquartile range
+IQR(pmean)
+# vi. Five number summary (read the docs for, and use fivenum() function)
+fivenum(pmean)
+# vii. Five number summary using quantile function
+quantile(pmean)
+```
+What i did here was calculate the mean,median, standard deviation, median absolute deviation, interquartile range, five number summary, and five number summary using quantile by using the functions built in R. These were all run and the Results are show above. The values are listed with the mean being the average, median which would be the middle of the data set, and standard deviation being a measured amount of variation from the set of values. So in this case if the number is high, this number would be farther from the mean and vice versa. Median absolute deviation shows how spread out the data set is. Interquartile range is a a value setting the data into specific ranges. The five number summary gives out a set of information about the data set. The five number summary using quantile function is using the five number summary that is minimal in the 4 quantile ranges. 
+
+```{r Question 4d. For average gene expression per gene calculate the same measures of center and spread as above – explain results obtained:}
+# i. Mean
+mean(gmean)
+# ii. Median
+median(gmean)
+# iii. Standard deviation (sd)
+sd(gmean)
+# iv. Median absolute deviation (mad)
+mad(gmean)
+# v. Interquartile range
+IQR(gmean)
+# vi. Five number summary (read the docs for, and use fivenum() function)
+fivenum(gmean)
+# vii. Five number summary using quantile function
+quantile(gmean)
+```
+Similar to the question above I calculated the same functions(mean,median, standard deviation, median absolute deviation, interquartile range, five number summary, and five number summary using quantile) built in R. These were all run and the Results are show above. The values are listed with the mean being the average, median which would be the middle of the data set, and standard deviation being a measured amount of variation from the set of values. So in this case if the number is high, this number would be farther from the mean and vice versa. Median absolute deviation shows how spread out the data set is. Interquartile range is a a value setting the data into specific ranges. The five number summary gives out a set of information about the data set. The five number summary using quantile function is using the five number summary that is minimal in the 4 quantile ranges. Even though it is a similar data set that was rearranged differently the majority of our results are different, even though we are looking for the same statistical data. 
+
+
+```{r Question 4e. Find genes with the highest and the lowest expression levels across patients – capture their names and characteristic expression levels Calculate for each of them the above measures of center and spread across patients. Plot distributions of their expression levels across patients using all visualization techniques practiced above.}
+
+#lowest gene expression level across patients
+gmean[min(gmean)==gmean]
+lowestgmin <- data[gmean==min(gmean)]
+
+#statistics
+# i. Mean
+mean(lowestgmin)
+# ii. Median
+median(lowestgmin)
+# iii. Standard deviation (sd)
+sd(lowestgmin)
+# iv. Median absolute deviation (mad)
+mad(lowestgmin)
+# v. Interquartile range
+IQR(lowestgmin)
+# vi. Five number summary (read the docs for, and use fivenum() function)
+fivenum(lowestgmin)
+# vii. Five number summary using quantile function
+quantile(lowestgmin)
+
+#plots
+# i. Histogram
+hist(lowestgmin)
+# ii. Boxplot
+boxplot(lowestgmin)
+# iii. Stripchart
+stripchart((lowestgmin))
+# iv. Stem-and-leaf
+stem(lowestgmin)
+# v. Dotchart
+dotchart(lowestgmin)
+# vi. Sorted in ascending order
+plot(sort(lowestgmin))
+
+#highest gene expression level across patients
+gmean[max(gmean)==gmean]
+gmax<-gmean[max(gmean)==gmean]
+
+#statistics
+# i. Mean
+mean(gmax)
+# ii. Median
+median(gmax)
+# iii. Standard deviation (sd)
+sd(gmax)
+# iv. Median absolute deviation (mad)
+mad(pmean)
+# v. Interquartile range
+IQR(gmax)
+# vi. Five number summary (read the docs for, and use fivenum() function)
+fivenum(gmax)
+# vii. Five number summary using quantile function
+quantile(gmax)
+
+#plots
+# i. Histogram
+hist(gmax)
+# ii. Boxplot
+boxplot(gmax)
+# iii. Stripchart
+stripchart((gmax))
+# iv. Stem-and-leaf
+stem(gmax)
+# v. Dotchart
+dotchart(gmax)
+# vi. Sorted in ascending order
+plot(sort(gmax))
+
+```
+
+
+```{r Question 4f. Qualitatively compare distributions of mean gene expression levels per gene and per patient. Describe results of such comparison in plain English.}
+
+#per gene
+# i. Mean
+mean(gmean)
+# ii. Median
+median(gmean)
+# iii. Standard deviation (sd)
+sd(gmean)
+
+#per patient
+# i. Mean
+mean(pmean)
+# ii. Median
+median(pmean)
+# iii. Standard deviation (sd)
+sd(pmean)
+
+```
+Looking at the both the mean gene expression per level of gene and patient, I do not see a distribution difference within the mean.  Looking at different values on the other hand, I do see some variations with the numbers  and will use the mean median and mode as examples. Comparing the values above, the median is pretty close to each other so there is a small difference in distribution. In terms of the Standard deviation, the distribution is pretty far. I think this maybe due to the how each data set was produced as a matrix. In terms the mean, the large data set was distributed the same way so the amount of patients should reach the value to be the same. 

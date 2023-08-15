@@ -1,0 +1,732 @@
+---
+title: "week 6+ 7 homework assignment"
+author: "Christopher Tran"
+date: "2/18/2022"
+output: html_document
+---
+1. (20) In the Notes we did not assess the SVM model by cross-validation. Let’s do it now!
+
+a. Write a wrapper predict.SVM in the same way we wrote other wrappers in the Notes. IMPORTANT: the predict() function returns a factor when SVM model is used as an argument. This will break our cross-validation “harness” code that assumes the predictions are returned as a simple numerical vector. Thus, don’t forget to convert the output of predict() into numeric vector inside your wrapper.
+
+b. Use the wrapper you wrote and our cross.validate() function we developed in the Notes in order to assess the prediction accuracy of SVM model with radial kernel and trained on first 20 most significant genes.
+
+
+```{r, error=TRUE}
+# a
+# calling library and setting variables
+library(breastCancerNKI)
+suppressPackageStartupMessages(library(Biobase))
+library(e1071)
+data(nki)
+class(nki)
+dim(nki)
+
+ge=exprs(nki) 
+t.m = pData(nki)$t.rfs 
+e.m = pData(nki)$e.rfs
+er.m= pData(nki)$er
+n.m=pData(nki)$node
+
+# setting recurance and cut off
+
+T = 3000 
+sample.sel = ! is.na(t.m) & ( t.m >= T | t.m < T & e.m == 1 ) 
+
+# setting genes
+ge = ge[,sample.sel]
+e.m = e.m[sample.sel]
+
+
+# setting factor
+e.m=factor(e.m,levels=c(0,1)) # convert to a factor
+# setting pvalue
+tt.pvals=apply(ge,1,function(x) t.test( x ~ e.m )$p.value )
+
+#setting and ordering data frame
+df=as.data.frame(t(ge[order(tt.pvals),]))
+
+# creating assess.prediction function
+assess.prediction=function(truth,predicted) {
+ predicted = predicted[ ! is.na(truth) ]
+ truth = truth[ ! is.na(truth) ]
+ truth = truth[ ! is.na(predicted) ]
+ predicted = predicted[ ! is.na(predicted) ]
+ cat("Total cases that are not NA: ",length(truth),"\n",sep="") 
+ cat("Correct predictions (accuracy): ",sum(truth==predicted),
+ "(",signif(sum(truth==predicted)*100/length(truth),3),"%)\n",sep="")
+
+ TP = sum(truth==1 & predicted==1)
+ TN = sum(truth==0 & predicted==0)
+ FP = sum(truth==0 & predicted==1)
+ FN = sum(truth==1 & predicted==0)
+ P = TP+FN 
+ N = FP+TN 
+ cat("TPR (sensitivity)=TP/P: ", signif(100*TP/P,3),"%\n",sep="")
+ cat("TNR (specificity)=TN/N: ", signif(100*TN/N,3),"%\n",sep="")
+ cat("PPV (precision)=TP/(TP+FP): ", signif(100*TP/(TP+FP),3),"%\n",sep="")
+ cat("FDR (false discovery)=1-PPV: ", signif(100*FP/(TP+FP),3),"%\n",sep="")
+ cat("FPR =FP/N=1-TNR: ", signif(100*FP/N,3),"%\n",sep="")
+}
+
+# creating do.check function
+do.check=function(data,model) {
+ if ( is.null(data) ) { stop("New data must be specified") }
+ if ( is.null(model) ) {
+ stop("The model has not been trained yet!")
+ }
+}
+
+# creating predict function
+predict = function(M,newdata,...) {
+ if ( inherits(M,"svm") && ! is.null(newdata) ) {
+ has.na = apply(newdata,1,function(x) any(is.na(x)) )
+ has.data = which(! has.na);
+ has.na = which( has.na)
+ pred = stats::predict(M,newdata[has.data,,drop=F],...)
+ pred.with.na = pred[1] 
+ pred.with.na[ has.data ] = pred
+ pred.with.na[ has.na ] = NA
+ pred.with.na 
+ } else {
+ stats::predict(M,newdata,...)
+ }
+}
+
+# creating predictor.svm function
+predictor.SVM = list(
+ model = NULL,
+ train = function(f,data,...) {
+ predictor.SVM$model <<- svm(f, data,...) 
+ },
+ predict=function(newdata=NULL) {
+ do.check(newdata,predictor.SVM$model)
+ as.numeric( 
+ as.character(predict(predictor.SVM$model,newdata)) > 0.5
+ )
+}
+)
+
+
+# b
+# creating cross validation  function
+cross.validate=function(predictor,formula,data=NULL,
+ method="random", N=1000, n.out=5,...) {
+ if ( is.null(data) ) { stop("data must be specified") }
+ f.str = deparse(formula)
+ dependent.name = sub("\\s*~.*","",f.str)
+ if ( ! dependent.name %in% names(data) ) {
+ dependent.data = get(dependent.name,envir=environment(formula))
+ data=cbind(dependent.data,data)
+ names(data)[1] = dependent.name
+ } else {
+ ind = match(dependent.name,names(data))
+ data = cbind( data[,ind,drop=F],data[,-ind,drop=F] )
+ }
+ truth = data[,dependent.name] 
+ truth = truth[0] 
+ prediction=numeric()
+ 
+ for ( i in 1:N ) {
+ leave.out = sample(nrow(data),size=n.out)
+ training.data = data[-leave.out,,drop=F]
+ test.data = data[leave.out,,drop=F]
+ predictor$train(formula , data=training.data,...)
+ pred=predictor$predict(test.data[,-1,drop=F])
+ truth[ (length(truth)+1):(length(truth)+n.out) ] = 
+ test.data[,dependent.name]
+ prediction = c(prediction, pred)
+ }
+ list(truth=truth,prediction=prediction)
+}
+
+# running predictor svm 
+predictor.SVM$train(e.m ~ . , df[1:20])
+assess.prediction(e.m, predictor.SVM$predict(df[1:20]))
+# running cross validation
+cv.SVM.20=cross.validate(predictor.SVM, e.m ~ . , df[1:20])
+assess.prediction(cv.SVM.20$truth,cv.SVM.20$prediction)
+
+cv.SVM.20r=cross.validate(predictor.SVM, e.m ~ . , df[1:20],kernel="radial")
+assess.prediction(cv.SVM.20r$truth,cv.SVM.20r$prediction)
+```
+
+
+2. (30) Rerun the code from p.13 of the Notes for Week 6, Part 3 with the SVM wrapper you just wrote, in order to collect the prediction accuracy for radial kernel models trained on different numbers of variables K=1:20. Generate the plots of the accuracy, sensitivity, and specificity as the functions of K (same way we did in the Notes). Comment on your findings. NOTE: the calculation takes a few minutes, so it’s very inefficient to debug your code while waiting for the result for minutes or longer at a time. For debugging, use e.g. K=1:3; you can also use much smaller number of cross-validation runs N (for instance N=10), while debugging. When everything seems to work, perform a full run with K=1:20 and N=1000. 
+
+
+```{r,error=TRUE}
+
+# using updated assess.prediction function
+assess.prediction=function(truth,predicted,print.results=FALSE) {
+ predicted = predicted[ ! is.na(truth) ]
+ truth = truth[ ! is.na(truth) ]
+ truth = truth[ ! is.na(predicted) ]
+ predicted = predicted[ ! is.na(predicted) ]
+ result = list()
+ result$accuracy = sum(truth==predicted)*100/length(truth)
+ if ( print.results ) {
+ cat("Total cases that are not NA: ",length(truth),"\n",sep="")
+ cat("Correct predictions (accuracy): ",sum(truth==predicted),
+ "(",signif(result$accuracy,3),"%)\n",sep="")
+ }
+ TP = sum(truth==1 & predicted==1)
+ TN = sum(truth==0 & predicted==0)
+ FP = sum(truth==0 & predicted==1)
+ FN = sum(truth==1 & predicted==0)
+ P = TP+FN 
+ N = FP+TN # total number of negatives
+ result$TPR = 100*TP/P
+ result$TNR = 100*TN/N
+ result$PPV = 100*TP/(TP+FP)
+ result$FDR = 100*FP/(TP+FP)
+ result$FPR = 100*FP/N
+ if ( print.results ) {
+ cat("TPR (sensitivity)=TP/P: ", signif(result$TPR,3),"%\n",sep="")
+ cat("TNR (specificity)=TN/N: ", signif(result$TNR,3),"%\n",sep="")
+ cat("PPV (precision)=TP/(TP+FP): ", signif(result$PPV,3),"%\n",sep="")
+ cat("FDR (false discovery)=1-PPV: ", signif(result$FDR,3),"%\n",sep="")
+ cat("FPR =FP/N=1-TNR: ", signif(result$FPR,3),"%\n",sep="")
+ }
+ if ( print.results ) { invisible(result) }
+ else { result }
+}
+
+# setting varibles 
+fit.metrics = matrix(ncol=20,nrow=3)
+pred.metrics = matrix(ncol=20,nrow=3)
+row.names(fit.metrics) = c("ACC","TPR","TNR")
+row.names(pred.metrics) = c("ACC","TPR","TNR")
+# looping for cross validation and svm 
+for ( n.var in 1:20 ) {
+ # calculate the fit, obtain and store its metrics for each n.var:
+ predictor.SVM$train(e.m ~ . , df[,1:n.var,drop=F])
+ metrics = assess.prediction(e.m,predictor.SVM$predict(df[,1:n.var,drop=F]))
+ fit.metrics[,n.var]=c(metrics$accuracy, metrics$TPR, metrics$TNR)
+ # now crosss-validate and also store the metrics:
+ c.val = cross.validate(predictor.SVM, e.m ~ . , df[,1:n.var,drop=F])
+ metrics = assess.prediction( c.val$truth, c.val$prediction ) 
+ pred.metrics[,n.var]=c(metrics$accuracy, metrics$TPR, metrics$TNR)
+}
+
+
+# plot metrics as functions of the number of variables:
+oldpar=par(mfrow=c(1,3),cex=1.2,cex.axis=1.3,cex.lab=1.3)
+plot(1:20,fit.metrics["ACC",],type="b",pch=20,lwd=2,lty=3,col="blue",
+ ylim=c(55,100),xlab="N Variables",ylab="Accuracy")
+lines(1:20,pred.metrics["ACC",],lwd=2,col="blue")
+points(1:20,pred.metrics["ACC",],pch=20,col="blue")
+plot(1:20,fit.metrics["TPR",],type="b",pch=20,lwd=2,lty=3,col="darkgreen", 
+ ylim=c(55,100),xlab="N Variables",ylab="Sensitivity")
+lines(1:20,pred.metrics["TPR",],lwd=2,lty=1,col="darkgreen")
+points(1:20,pred.metrics["TPR",],pch=20,col="darkgreen")
+plot(1:20,fit.metrics["TNR",],type="b",pch=20,lwd=2,lty=3,col="darkred", 
+ ylim=c(55,100),xlab="N Variables",ylab="Specificity")
+lines(1:20,pred.metrics["TNR",],lwd=2,lty=1,col="darkred")
+points(1:20,pred.metrics["TNR",],pch=20,col="darkred")
+par(oldpar)
+
+
+```
+
+Looking at what has been generated we can see that predicted metrics ( the dots) are were the values are suppose to be. With what is given with our connected points, it makes sense with what has been given with our accuracy, sensitivity, and specificity results. I can see the importants of these graphs as this can measure many things within our future experiments  and quality control steps within science.
+
+The Variables that is growth within each variable. with the  sensitivety and specificity graph, there looks to be no growth at the 5 point for sensitivity and 2 or 3 at the specificity. There is seems to be significant growth and stability with each variable that is given.
+
+3. (30) Let us now see if we can use cross-validation to tune the model parameters. Let’s take a vector of the radial kernel decay parameters , let’s say gamma = c(0.001,0.005,0.01,0.05,0.1,0.5,1); Using your results from Problem 2, fix some “reasonable” number of variables you want to use, e.g. K=10. Modify the code you used in Problem 2 so that now you cross-validate models at each of the different values of  you chose, all with the same fixed number of variables. Generate the plots in a similar way (accuracy, sensitivity, and specificity, as functions of the parameter gamma of the model – you may want to use log10 gamma in the plot with the values suggested above). Comment on your results. Do we have a good choice for gamma? 
+
+
+```{r, error=TRUE}
+# creating assess.preidction
+assess.prediction=function(truth,predicted,print.results=FALSE) {
+ predicted = predicted[ ! is.na(truth) ]
+ truth = truth[ ! is.na(truth) ]
+ truth = truth[ ! is.na(predicted) ]
+ predicted = predicted[ ! is.na(predicted) ]
+ result = list()
+ result$accuracy = sum(truth==predicted)*100/length(truth)
+ if ( print.results ) {
+ cat("Total cases that are not NA: ",length(truth),"\n",sep="")
+ cat("Correct predictions (accuracy): ",sum(truth==predicted),
+ "(",signif(result$accuracy,3),"%)\n",sep="")
+ }
+ TP = sum(truth==1 & predicted==1)
+ TN = sum(truth==0 & predicted==0)
+ FP = sum(truth==0 & predicted==1)
+ FN = sum(truth==1 & predicted==0)
+ P = TP+FN 
+ N = FP+TN # total number of negatives
+ result$TPR = 100*TP/P
+ result$TNR = 100*TN/N
+ result$PPV = 100*TP/(TP+FP)
+ result$FDR = 100*FP/(TP+FP)
+ result$FPR = 100*FP/N
+ if ( print.results ) {
+ cat("TPR (sensitivity)=TP/P: ", signif(result$TPR,3),"%\n",sep="")
+ cat("TNR (specificity)=TN/N: ", signif(result$TNR,3),"%\n",sep="")
+ cat("PPV (precision)=TP/(TP+FP): ", signif(result$PPV,3),"%\n",sep="")
+ cat("FDR (false discovery)=1-PPV: ", signif(result$FDR,3),"%\n",sep="")
+ cat("FPR =FP/N=1-TNR: ", signif(result$FPR,3),"%\n",sep="")
+ }
+ if ( print.results ) { invisible(result) }
+ else { result }
+}
+# setting variables
+g = c(0.001,0.005,0.01,0.05,0.1,0.5,1)
+k=10
+fit.metrics = matrix(ncol=20,nrow=3)
+pred.metrics = matrix(ncol=20,nrow=3)
+row.names(fit.metrics) = c("ACC","TPR","TNR")
+row.names(pred.metrics) = c("ACC","TPR","TNR")
+
+# for loop for gamma call for svm and cross validation
+for(j in g){
+  for ( i in  1:k){
+    # calling each predictor with gamma
+      predictor.SVM$train(e.m~.,df[,1:20,drop=F],kernel="radial",gamma=j)
+      metrics=assess.prediction(e.m,predictor.SVM$predict(df[,1:20,drop=F]))
+      fit.metrics[,i]=c(metrics$accuracy, metrics$TPR, metrics$TNR)
+      
+      c.val = cross.validate(predictor.SVM, e.m ~ . , df[,1:20,drop=F],kernel="radial",gamma=j)
+      metrics = assess.prediction( c.val$truth, c.val$prediction )
+      pred.metrics[,i]=c(metrics$accuracy, metrics$TPR, metrics$TNR)
+  }
+# ploting graphs per gamma
+oldpar=par(mfrow=c(1,3),cex=1.2,cex.axis=1.3,cex.lab=1.3)
+plot(1:20,fit.metrics["ACC",],type="b",pch=20,lwd=2,lty=3,col="blue",
+ ylim=c(55,100),xlab="N Variables",ylab="Accuracy")
+lines(1:20,pred.metrics["ACC",],lwd=2,col="blue")
+points(1:20,pred.metrics["ACC",],pch=20,col="blue")
+plot(1:20,fit.metrics["TPR",],type="b",pch=20,lwd=2,lty=3,col="darkgreen", 
+ ylim=c(55,100),xlab="N Variables",ylab="Sensitivity")
+lines(1:20,pred.metrics["TPR",],lwd=2,lty=1,col="darkgreen")
+points(1:20,pred.metrics["TPR",],pch=20,col="darkgreen")
+plot(1:20,fit.metrics["TNR",],type="b",pch=20,lwd=2,lty=3,col="darkred", 
+ ylim=c(55,100),xlab="N Variables",ylab="Specificity")
+lines(1:20,pred.metrics["TNR",],lwd=2,lty=1,col="darkred")
+points(1:20,pred.metrics["TNR",],pch=20,col="darkred")
+par(oldpar)
+}
+
+```
+
+Judging from what was given in my graph, I can see that some points of gamma were a  right choice. There are some instances of gamma where points are completely off, and others looking as though it is on the right spot. This could be the line of code that I wrote which gave me these results. I think for the most part, the majority of gamma did not seem to be right as it looked to give an opposite effect.
+
+
+4. (70) Variable forward selection. We have mentioned that choosing “top N” variables (genes) is not an optimal procedure. No doubt, all these genes are strongly correlated with the outcome, that’s how we chose them in the first place. But if they are also very strongly correlated among each other, then using top 10 does not add much information to the model beyond what we could already have with top one. You have seen a hint at that effect in Homework 5. Let us now get it right. To keep it simple, we will be using only gene expression levels but not the clinical variables (in fact, it turns out that gene expression levels are better predictors, the procedure outlined below would not pick clinical parameters even if we included them!!).In order to run the heuristic forward selection algorithm as described in the Notes, we need two ingredients:
+
+a. “Correlations” of each feature (gene) with the outcome. Since our outcome is a binary variable, the pearson correlation is not a good metric. Instead, we have been using t-test p-values as a measure of the association (and we had them already computed and saved in tt.pvals variable). We need to rescale those p-values, however, so that they would be on the scale comparable to the “regular” correlation coefficients. Negative log10(p-value) transforms p-values into a more linear scale, but it’s still too wide. In addition, one can argue that pvalues of 10-5and 10-7both indicate an extremely strong correlation; on the log scale these two values would differ by 2, which might differentiate them more than we like (they are both “very good”). Thus we would like to “squeeze” the log-transformed p-values in some nonlinear fashion (so that all p-values that are “good” end up being similar after the transformation). We will be using the familiar logistic function, 𝐶 = 1/[1 + exp(log10(p-value)+1)]. When p-value is 0.1, this artificial “correlation” will be equal to 0.5. P-values 0.01 or 0.001 will be transformed into C=0.73 and 0.88, respectively. As the p-value further decreases, “pseudo-correlation” C will saturate at 1. There is not much justification for this procedure, it’s just heuristics, but it will do the job. We will be using top 1000 genes (for simplicity, feasibility of the calculations on a modest laptop, and also because the 1000-th gene already has p-value ~0.2 – it is not very likely that genes that have no association with the outcome would be good predictors!). For the top 1000 genes, calculate the “pseudo-correlation” C to the outcome, as defined above. You can use tt.pvals for the p-values (this variable was computed in Week 5 Notes, Part 2), just remember that we want the vector C to be in the correct order (matching the order of columns in our dataframe df, i.e. from most significant to least significant). In the following, we will refer to this vector as corrs.to.outcome.
+
+b. Correlations among the features. This part is easy. Top 1000 genes are the first 1000 columns of the dataframe df we have been using all along.Hence, just calculate the correlation matrix between the first 1000 columns of df. Use finction cor() and set optional parameter use="pairwise" (so that when calculating the correlation coefficient between any two features, only the observations that are NA in either of these two features are discarded). Save the result into varable corrs.Now we can run forward selection. The empirical scores as defined in the notes can be calculated with the following code:
+# how many features we want to select:
+N=10
+# select the gene most correlated with the outcome:
+selected = which.max(corrs.to.outcome)
+a = 0.5 # parameter alpha; it’s tunable but we just set 0.5
+# for each candidate feature, the first term is its 
+# correlation with the outcome. Note that this term does not
+# depend on what we have selected so far:
+term1 = corrs.to.outcome
+# select remaining N-1 features:
+for ( i in 1:(N-1) ) {
+ # the second term is the penalty for the correlation 
+ # between the features and those that we have already
+ # selected; this term depends on current selection,
+ # obviously, and needs to be recalculated every time. 
+ # for k-th feature, the k-th column of the correlation 
+ # matrix lists the correlation coefficients between this
+ # feature and all other features (row j=correlation to 
+ # feature j). Thus for each feature (column) we sum up
+ # the absolute correlation coefficients to all features
+ # that are already selected: 
+ term2 = apply(abs(corrs[selected,,drop=F]),2,sum)
+ # vector of scores: one for every feature:
+ score = term1 - a*term2
+ # now we have to find the feature with the largest score
+ # among those that *have not been selected yet*:
+ for ( s in order(score,decreasing=T) ) {
+ #traverse the features in the order of decreasing 
+ # scores until we encounter the first one that 
+ # was not selected yet. Save it and we are done
+ # with the current iteration
+ if ( ! s %in% selected ) {
+ selected = c(selected,s)
+ break 
+ }
+}
+}
+
+Understand the code shown above and run it to select
+a. 10 features;
+
+b. 20 features.
+
+Save the results (e.g. into selected10 and selected20). Remember that our features in df dataframe are already sorted according to the significance of their association with the outcome e.m. Thus, for instance, the 10 top features (most associated) are simply columns 1:10 (that’s what we have been using in our models so far). Examine the selections we just made. What columns (features) are we picking now? Are we still just picking features most associated with the outcome? Print and examine the submatrix of correlation coefficients between the selected features (corrs[selected,selected]). What do you see? Comment on your findings.Finally, use our cross-validation harness and model wrappers predict.LR and predict.SVM in order to assess the prediction accuracies of Logistic Regression model and Support Vector Machine (with linear kernel)) on the forward-selected 10 and 20 features, as calculated above. Show your results (the calculated accuracy metrics). How do these models perform compared to the naïve “top 10” or “top 20” models we have been using before (you can rerun cross-validation on those models right here and show the results)? Is there any improvement in accuracy? How do these two models (LR/SVM) compare to each other on forward-selected features? Comment on your findings.
+
+```{r, error=TRUE}
+# a
+# calling libraries and setting variables
+library(breastCancerNKI)
+suppressPackageStartupMessages(library(Biobase))
+library(e1071)
+data(nki)
+class(nki)
+dim(nki)
+
+ge=exprs(nki) 
+t.m = pData(nki)$t.rfs 
+e.m = pData(nki)$e.rfs
+er.m= pData(nki)$er
+n.m=pData(nki)$node
+
+# setting recurrence and cut off
+
+T = 3000 
+sample.sel = ! is.na(t.m) & ( t.m >= T | t.m < T & e.m == 1 ) 
+
+# setting genes
+ge = ge[,sample.sel]
+e.m = e.m[sample.sel]
+
+# setting factor
+e.m=factor(e.m,levels=c(0,1)) # convert to a factor
+# setting pvalue
+tt.pvals=apply(ge,1,function(x) t.test( x ~ e.m )$p.value )
+
+#setting and ordering data frame
+df=as.data.frame(t(ge[order(tt.pvals),]))
+
+#creating assess prediciton function
+assess.prediction=function(truth,predicted) {
+ predicted = predicted[ ! is.na(truth) ]
+ truth = truth[ ! is.na(truth) ]
+ truth = truth[ ! is.na(predicted) ]
+ predicted = predicted[ ! is.na(predicted) ]
+ cat("Total cases that are not NA: ",length(truth),"\n",sep="") 
+ cat("Correct predictions (accuracy): ",sum(truth==predicted),
+ "(",signif(sum(truth==predicted)*100/length(truth),3),"%)\n",sep="")
+
+ TP = sum(truth==1 & predicted==1)
+ TN = sum(truth==0 & predicted==0)
+ FP = sum(truth==0 & predicted==1)
+ FN = sum(truth==1 & predicted==0)
+ P = TP+FN 
+ N = FP+TN 
+ cat("TPR (sensitivity)=TP/P: ", signif(100*TP/P,3),"%\n",sep="")
+ cat("TNR (specificity)=TN/N: ", signif(100*TN/N,3),"%\n",sep="")
+ cat("PPV (precision)=TP/(TP+FP): ", signif(100*TP/(TP+FP),3),"%\n",sep="")
+ cat("FDR (false discovery)=1-PPV: ", signif(100*FP/(TP+FP),3),"%\n",sep="")
+ cat("FPR =FP/N=1-TNR: ", signif(100*FP/N,3),"%\n",sep="")
+}
+
+# a
+# setting pvvalue logs
+pv=log10(tt.pvals)
+
+# creating c variable of pv
+C= (1/(1 + exp(pv+1)))
+
+
+# b
+# settomg decreasomg prder
+corrs.to.outcome=sort(C,decreasing=TRUE)[1:1000]
+
+# pairwise cor function
+corrs=cor(df[1:1000],use="pairwise")
+
+# c
+# how many features we want to select:
+N=10
+N2=20
+# select the gene most correlated with the outcome:
+selected = which.max(corrs.to.outcome)
+
+a = 0.5 # parameter alpha; it’s tunable but we just set 0.5
+# for each candidate feature, the first term is its 
+# correlation with the outcome. Note that this term does not
+# depend on what we have selected so far:
+term1 = corrs.to.outcome
+
+# function for select
+selected.func<-function(N){    
+    for ( i in 1:(N-1) ) {
+        term2 = apply(abs(corrs[selected,, drop=F]),2,sum)  
+        score = term1 - a*term2
+        for ( s in order(score,decreasing=T) ) {
+            if ( ! s %in% selected ) {
+                selected = c(selected,s)
+                break
+            }
+        }
+    }
+    return (selected)
+}
+
+# variable for selected 10 and 20
+selected10=selected.func(N)
+selected20=selected.func(N2)
+
+selected10
+
+selected20
+
+# caling cors with selected 10 and selected 20
+corrs[selected10,selected10]
+corrs[selected20,selected20]
+corrs[selected20,selected10]
+corrs[selected10,selected20]
+
+# creating LR wrapper
+do.check=function(data,model) {
+ if ( is.null(data) ) { stop("New data must be specified") }
+ if ( is.null(model) ) {
+ stop("The model has not been trained yet!")
+ }
+}
+
+predict = function(M,newdata,...) {
+ if ( inherits(M,"svm") && ! is.null(newdata) ) {
+ has.na = apply(newdata,1,function(x) any(is.na(x)) )
+ has.data = which(! has.na);
+ has.na = which( has.na)
+ pred = stats::predict(M,newdata[has.data,,drop=F],...)
+ pred.with.na = pred[1] 
+ pred.with.na[ has.data ] = pred
+ pred.with.na[ has.na ] = NA
+ pred.with.na 
+ } else {
+ stats::predict(M,newdata,...)
+ }
+}
+
+predictor.LR = list(
+ model = NULL,
+ train = function(f,data,...) {
+ # this wrapper is trivial. To train a LR model, we pass to it
+ # the formula and the data; additional parameters to glm()
+ # such as family and na.action are fixed, we never want to change
+ # them, so we do not expose them at all. IMPORTANT: note the
+ # use of operator <<-. If we used a conventional assignment operator
+ # (= or <- ), we would make an assignment only for the duration of
+ # of this function; when the function returns, the data in the 
+ # global environment will be unchanged!! Operator <<- explicitly
+ # requests assignment in the global environment instead. It is safe
+ # to use predictor.LR$model here despite we are still in the process
+ # of defining predictor.LR list, so strictly speaking it is not in
+ # the global environment yet: the functions in R are not compiled.
+ # They are simply stored and their evaluation starts only when they
+ # are called. By that time predictor.LR will already exist!
+ predictor.LR$model <<- glm(f, data,
+ family="binomial",na.action="na.exclude",...) 
+ },
+ predict=function(newdata=NULL) {
+ # check that we got data and that the model was already trained:
+ do.check(newdata,predictor.LR$model)
+ # here we wrap the specifics of predicting with LR: the original
+ # predict would return the probabilities, so we have to apply the 
+ # decision cutoff and convert to numeric in order to get predicted 
+ # classes. All these gory details are hidden in this wrapper:
+ as.numeric( 
+ predict(predictor.LR$model,newdata,type="response") > 0.5
+ )
+}
+)
+
+
+# logistic regression
+predictor.LR$train(e.m ~ . , df[1:20])
+assess.prediction(e.m, predictor.LR$predict(df[1:20]))
+
+cv.LR.20=cross.validate(predictor.LR, e.m ~ . , df[1:20])
+assess.prediction(cv.LR.20$truth,cv.LR.20$prediction)
+
+# selected 10
+predictor.LR$train(e.m ~ . , df[,selected10])
+assess.prediction(e.m, predictor.LR$predict(df[,selected10]))
+
+cv.LR.10sel=cross.validate(predictor.LR, e.m ~ . , df[,selected10])
+assess.prediction(cv.LR.10sel$truth,cv.LR.10sel$prediction)
+# selected 20
+predictor.LR$train(e.m ~ . , df[,selected20])
+assess.prediction(e.m, predictor.LR$predict(df[,selected20]))
+
+cv.LR.20sel=cross.validate(predictor.LR, e.m ~ . , df[selected20])
+assess.prediction(cv.LR.20sel$truth,cv.LR.20sel$prediction)
+
+# naive bay
+Mb20=naiveBayes(e.m ~ . , data=df[,1:20])
+assess.prediction(e.m,predict(Mb20,df[,1:20]))
+
+# selected 10
+Mb10sel=naiveBayes(e.m ~ . , data=df[,selected10])
+assess.prediction(e.m,predict(Mb10sel,df[,selected10]))
+
+cv.Mb.10sel=cross.validate(predictor.LR, e.m ~ . , df[selected10])
+assess.prediction(cv.Mb.10sel$truth,cv.Mb.10sel$prediction)
+
+scv.Mb.10sel=cross.validate(predictor.SVM, e.m ~ . , df[,1:10])
+assess.prediction(scv.Mb.10sel$truth,scv.Mb.10sel$prediction)
+# selected 20
+Mb20sel=naiveBayes(e.m ~ . , data=df[,selected20])
+assess.prediction(e.m,predict(Mb20sel,df[,selected20]))
+
+cv.Mb.20sel=cross.validate(predictor.LR, e.m ~ . , df[selected20])
+assess.prediction(scv.Mb.20sel$truth,scv.Mb.20sel$prediction)
+
+scv.Mb.20sel=cross.validate(predictor.SVM, e.m ~ . , df[,1:20])
+assess.prediction(cv.Mb.20sel$truth,cv.Mb.20sel$prediction)
+
+# predictor SVM
+predictor.SVM$train(e.m ~ . , df[selected10],kernel="linear")
+assess.prediction(e.m, predictor.SVM$predict(df[selected10]))
+
+scv.SVM.10=cross.validate(predictor.SVM, e.m ~ . , df[selected10],kernel="linear")
+assess.prediction(scv.SVM.10$truth,scv.SVM.10$prediction)
+
+predictor.SVM$train(e.m ~ . , df[selected20],kernel="linear")
+assess.prediction(e.m, predictor.SVM$predict(df[selected20]))
+
+scv.SVM.20=cross.validate(predictor.SVM, e.m ~ . , df[selected20],kernel="linear")
+assess.prediction(scv.SVM.20$truth,scv.SVM.20$prediction)
+```
+
+When printing out the features, we are looking at genes for the results to be more fitted It was interesting to see the range to be from -1 to 1. When looking at the access prediction accuracy values, we see for all the modes the percentage is higher with more genes.
+
+
+5. (20) Rerun the code from the Notes, part 3 (Model Selection), section AIC/BIC criteria in order to fit the models M1, …, M20 on different numbers of features most significantly associated with the outcome. In addition, fit two more logistic regression models, one using 10 forward selected features, the other using 20 forward selected features (use forward selected features from Problem 4). Calculate AIC and BIC on all these models (M1, …, M20, plus two new ones). Comment on the results.
+
+```{r, error=TRUE}
+# fit a few logistic regression models with different numbers of variables:
+M1=glm(e.m ~ . , data=df[,1,drop=F], family="binomial",na.action="na.exclude")
+M3=glm(e.m ~ . , data=df[,1:3], family="binomial",na.action="na.exclude")
+M5=glm(e.m ~ . , data=df[,1:5], family="binomial",na.action="na.exclude")
+M7=glm(e.m ~ . , data=df[,1:7], family="binomial",na.action="na.exclude")
+M10=glm(e.m ~ . , data=df[,1:10], family="binomial",na.action="na.exclude")
+M12=glm(e.m ~ . , data=df[,1:12], family="binomial",na.action="na.exclude")
+M15=glm(e.m ~ . , data=df[,1:15], family="binomial",na.action="na.exclude")
+M18=glm(e.m ~ . , data=df[,1:18], family="binomial",na.action="na.exclude")
+M20=glm(e.m ~ . , data=df[,1:20], family="binomial",na.action="na.exclude")
+Msel10=glm(e.m ~ . , data=df[,selected10], family="binomial",na.action="na.exclude")
+Msel20=glm(e.m ~ . , data=df[,selected20], family="binomial",na.action="na.exclude")
+# AIC and BIC functions (below) can take any number of models as their
+# arguments and compute the information criterion values for each of them:
+AIC(M1,M3,M5,M7,M10,M12,M15,M18,M20,Msel10,Msel20)
+BIC(M1,M3,M5,M7,M10,M12,M15,M18,M20,Msel10,Msel20)
+
+```
+
+
+Looking at our values, AIC has a lower value than BIC for both selected 10 and 20. With AIC, the values are significantly lower. With BIC, the values do go up but slightly, but are still lower than the values generated with M2-M20.
+
+
+6. (30) Fit random forest models on the 10 and on the 20 forward-selected features. Obtain the prediction accuracy of the models and comment on your findings: how do these models perform? How do they compare to top 10/20 as well as to other models fitted on forward selected features (LR and SVM from Problem 4).
+
+```{r, error=TRUE}
+# calling library and setting tree variable
+library(tree)
+library(randomForest)
+
+Mt.sel10=tree(e.m~.,df[selected10])
+Mt.sel20=tree(e.m~.,df[selected20])
+# summary of tree
+summary(Mt.sel10)
+summary(Mt.sel20)
+
+# creating assess prediction function
+
+assess.prediction=function(truth,predicted) {
+ predicted = predicted[ ! is.na(truth) ]
+ truth = truth[ ! is.na(truth) ]
+ truth = truth[ ! is.na(predicted) ]
+ predicted = predicted[ ! is.na(predicted) ]
+ cat("Total cases that are not NA: ",length(truth),"\n",sep="") 
+ cat("Correct predictions (accuracy): ",sum(truth==predicted),
+ "(",signif(sum(truth==predicted)*100/length(truth),3),"%)\n",sep="")
+
+ TP = sum(truth==1 & predicted==1)
+ TN = sum(truth==0 & predicted==0)
+ FP = sum(truth==0 & predicted==1)
+ FN = sum(truth==1 & predicted==0)
+ P = TP+FN 
+ N = FP+TN 
+ cat("TPR (sensitivity)=TP/P: ", signif(100*TP/P,3),"%\n",sep="")
+ cat("TNR (specificity)=TN/N: ", signif(100*TN/N,3),"%\n",sep="")
+ cat("PPV (precision)=TP/(TP+FP): ", signif(100*TP/(TP+FP),3),"%\n",sep="")
+ cat("FDR (false discovery)=1-PPV: ", signif(100*FP/(TP+FP),3),"%\n",sep="")
+ cat("FPR =FP/N=1-TNR: ", signif(100*FP/N,3),"%\n",sep="")
+}
+# tree wrapper
+predictor.T = list(
+ model = NULL,
+ train = function(f,data,...) {
+ predictor.T$model <<- randomForest(f, data,mtry=5,importance=TRUE,na.action="na.exclude", ...)
+},
+ predict=function(newdata=NULL) {
+ do.check(newdata,predictor.T$model) 
+ # implementation of predict() for decision tree models
+ # is “smart” enough to returns a *factor*; this will cause
+ # problems for our cross.validate() function that expects the 
+ # predictions to be a simple numeric vector, so we convert here: 
+ as.numeric(as.vector(
+ predict(predictor.T$model,newdata,type="class")
+ ))
+ }
+)
+# calling cross validation
+cv.t = cross.validate(predictor.T,e.m~.,df[1:5])
+assess.prediction(cv.t$truth,cv.t$prediction)
+
+
+cv.t10=cross.validate(predictor.T,e.m~.,df[selected10])
+assess.prediction(cv.t10$truth,cv.t10$prediction)
+
+cv.t20=cross.validate(predictor.T,e.m~.,df[selected20])
+assess.prediction(cv.t20$truth,cv.t20$prediction)
+
+# df with selected variables
+df.mts10=df[selected10]
+df.mts20=df[selected20]
+
+
+# trees with selected variables
+Mt.10=tree(e.m~.,df.mts10)
+Mt.20=tree(e.m~.,df.mts20)
+
+summary(Mt.10)
+summary(Mt.20)
+# setting prune misclass
+cv.tree(Mt.10,FUN=prune.misclass)
+cv.tree(Mt.20,FUN=prune.misclass)
+
+# setting prune
+Mt10.prune=prune.misclass(Mt.10,best=10)
+Mt20.prune=prune.misclass(Mt.20,best=20)
+
+# summary
+summary(Mt10.prune)
+summary(Mt20.prune)
+
+# plot
+plot(Mt10.prune)
+plot(Mt20.prune)
+
+
+# random forest of selected
+text(Mt10.prune)
+text(Mt20.prune)
+
+Mt.bag10=randomForest(e.m ~. ,data=df[selected10],
+ mtry=10,importance=TRUE,na.action="na.exclude")
+Mt.bag10
+
+
+Mt.bag20=randomForest(e.m ~. ,data=df[selected20],
+ mtry=20,importance=TRUE,na.action="na.exclude")
+Mt.bag20
+
+Mt.forest = randomForest(e.m ~. ,data=df[1:20],
+ mtry=5,importance=TRUE,na.action="na.exclude")
+Mt.forest
+
+```
+
+From the results given, the values are higher with more genes that are given. The cross validation shows with numbers generating 73% to 76% for accuracy.

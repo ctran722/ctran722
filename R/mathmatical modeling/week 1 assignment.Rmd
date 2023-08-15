@@ -1,0 +1,259 @@
+---
+title: "Week 1 assignment"
+author: "Christopher Tran"
+date: "1/5/2022"
+output:
+  html_document: default
+  pdf_document: default
+---
+1. (25) Examine the description of the humanHprdP2P table at the USCS web portal (it is hyperlinked as a “connected table” from the same knownGene description page we were looking at in the Notes). This data table lists all the protein-protein interactions in the HPRD database. As you can see, the format is very simple: each row describes an interaction as “query”  “target” (both query and target proteins being specified by their gene IDs), and the relation with knownGene table is via the familiar ‘name’ column of the latter (i.e. same transcript IDs are used in the HPRD and knownGene tables at UCSC). 
+
+a. Download the HPRD table (Mammal, Human, hg38, group=All Tables, table=humanHprdP2P) – the file size is about 27Mb (gzipped) – and load the data into your R session. This table represents known protein-protein interactions in humans (at least according to one of the available interaction databases, the HPRD). This is just an exercise, to save memory and to make things work faster you may load just first 1000 rows of the table (see nrow=… option) – note that if you have a large dataset, it is always a good idea to develop/debug your code on a small subset of data, so that you do not have to wait for a command to finish only to realize that you need to fix/modify it, again.
+
+b. Replace (or supplement) the transcript IDs of the both interaction partners in each row of HPRD table with gene symbols by joining the table with kgXref table (described in the Notes). We have two transcript IDs in each row, so you will need to perform two independent joins. Drop unneeded columns to keep your data clean, your final table should have columns (in arbitrary order): query (optional), target (optional), q.geneSymbol (required), t.geneSymbol (required), and distance (required).NOTE: if merge() command, as convenient as it is, proves to be inefficient and runs out of memory on your system (welcome to R!), you may need to do this manually: use match() command to map query IDs from the HPRD table onto the corresponding row indexes in kgXref and pull the corresponding gene symbols from those rows; then do the same for the ‘target’ column.
+
+```{r, error=TRUE}
+#a
+# acquired zip file and uploaded within R
+humanHprdp2p=read.table("humanHprdP2P.txt.gz",sep="\t",as.is=T,comment="",header=T,quote="")
+# humanHprdp2p[1:1000,1:3] 
+
+# head(humanHprdp2p)
+
+#b
+# merging kgXref and zip file
+kgxref=read.table("kgXref.txt",sep="\t",as.is=T,comment="",header=T,quote="")
+kgxref
+kgxref <- read.table("kgXref.txt.gz", stringsAsFactors = FALSE, sep = "\t")
+
+# colnames(kgxref)
+names(kgxref)[5]<-"q.symbol"
+# kgxref
+
+# colnames(humanHprdp2p)
+
+m=merge(humanHprdp2p,kgxref,by.x="X.query",by.y="X.kgID")
+m=m[,c("X.query","target","q.symbol","distance")]
+# m
+
+m2=merge(m,kgxref,by.x="target",by.y="X.kgID")
+# colnames(m2)
+names(m2)[3]<-"q.symbol"
+names(m2)[8]<-"t.symbol"
+m2=m2[,c("X.query","target","q.symbol","t.symbol","distance")]
+m2
+# m2
+```
+
+2. (25) Explore fitting ERCC controls count data from the SEQC dataset using variable transformations. You may use the same subset of the data we were 
+looking at in the Notes (single lane). Consider:
+
+a. The variance-stabilizing transformation 𝑌 → √𝑌. 
+
+b. The log-transformation 𝑌 → log2 𝑌.Use R to fit the corresponding linear models √𝑌~√𝑋 + 0 (without 
+intercept!) and log2 𝑌 ~ log2 𝑋 (with intercept), where Y are normalized read counts and X are actual concentrations in the mix. For the logtransformed data you may want to discard the datapoints where Y=0. [You can confirm if you want that keeping or discarding Y=0 datapoints makes almost no difference for original, Y~X+0 , or variance-stabilized models, as far as e.g. the fitted slopes or R2are concerned]. 
+
+c. Compare the R2(apply the summary() command to the fitted model object) as well as the fitted slope of the original physical dependence Y=aX as obtained in these two statistical models (you can easily derive a from the model fitted coefficients) and also in the untransformed model X~Y+0 we studied in the Note.
+
+d. Generate diagnostic plots for these two models, compare them to each other and to the diagnostic plot shown in the Notes, briefly discuss your observations. What seems to be the biggest problem with the original untransformed data that needs to be addressed first: is it heteroscedasticity (residuals don’t come from the same distribution) or very uneven distribution of the datapoints?
+
+```{r, error=TRUE}
+# loading library
+library(seqc)
+seqcounts=ILM_aceview_gene_AGR
+detach("package:seqc",unload=T)
+
+ercc.annot=read.table("https://assets.thermofisher.com/TFS-Assets/LSG/manuals/cms_095047.txt",as.is=T,header=T,row.names=NULL,sep="\t")
+ercc=read.table("https://assets.thermofisher.com/TFS-Assets/LSG/manuals/cms_095046.txt",as.is=T,header=T,row.names=NULL,sep="\t")
+ercc.table=merge(seqcounts[,1:5],ercc,by.x="Symbol",by.y="ERCC.ID")
+
+# notes of plotted concentration
+Y=ercc.table$A_1_L01_FlowCellA / ercc.table$GeneLength
+X=ercc.table$concentration.in.Mix.1
+plot(X,Y,pch=19,xlab="ERCC concentration",ylab="Normalized read count")
+abline(lm(Y~X+0),col="red")
+oldpar=par(mfrow=c(2,2))
+plot(lm(Y~X+0))
+par(oldpar)
+
+# a
+# square root x and y
+s.Y=sqrt(Y)
+s.X=sqrt(X)
+df.sXY=data.frame(s.Y,s.X)
+
+# b
+# log square root of x and y 
+l.Y=log(Y,base=2)
+l.X=log(X,base=2)
+# l.Y[!is.infinite(l.Y)]
+l.Y[is.infinite(l.Y)]<-NA
+df.lXY=data.frame(l.Y,l.X)
+
+# lm model removing infinite
+lm.sXYI=lm(s.Y~s.X+0,df.sXY,na.action=na.exclude)
+lm.sXYI
+
+lm.sXY=lm(s.Y~s.X,df.sXY,na.action=na.exclude)
+lm.sXY
+
+lm.lXYI=lm(l.Y~l.X+0,df.lXY,na.action=na.exclude)
+# lm.lXYI=lm(l.Y~l.X+0,df.lXY)
+lm.lXYI
+
+lm.lXY=lm(l.Y~l.X,df.lXY,na.action=na.exclude)
+# lm.lXY=lm(l.Y~l.X,df.lXY)
+lm.lXY
+
+# c
+# summary of model
+summary(lm.sXYI)
+summary(lm.sXY)
+
+summary(lm.lXYI)
+summary(lm.lXY)
+
+
+# d
+# plot lm model
+plot(lm.lXYI)
+plot(lm.lXY)
+
+plot(lm.sXYI)
+plot(lm.sXY)
+
+```
+As stated in the notes, the original data shows that the control is not reliable due to the fact that the data is fitted, leaving most visuals and values unaffected. More problems can arise when points at high concentrations are scattered father away from the fitted line. These apply to all the graphs shown. To fix this, using log is one way to change our data. I thin in this case, we are looking at the log with and without an intercept.I would think adding an intercept to scale would be easier to see the data,but in actually we would not want the intercept to be added since we are looing to see how this control is. 
+
+3. (25) Let us now run a purely “statistical” model without much mechanistic justification. We want to examine if there is a confounding effect of the 
+transcript GC content on the measured transcription level (normalized count). R does not have a function in the base package that would directly count the number of occurrences of a given letter in a character string. However, it has nchar() (total number of characters in the string) and gsub()(for substituting characters, see the documentation). Hence, if you have a character vector V (i.e. a vector of text strings), you can remove all A or T symbols from each of its elements with gsub("[AT]","",V), and then calculate with nchar() the lengths of the resulting strings that have only C or G remaining. 
+
+a. Normalize the GC counts in the ERCC mRNA sequences (in the Notes we downloaded a table that contains the latter) to the total lengths of 
+the original, unmodified sequences (and multiply by a 100 if you wish) to obtain GC percentage gc.pct.
+
+b. Fit a linear model with interaction for the log(normalized counts) for ERCC controls as function of concentration in the mix and %GC: log2 𝑌~ log2 𝑋 ∗ gc.pct (in R formulas, the shorthand ‘*’ notation means “consider both individual linear terms as well as the interaction”).
+
+c. Apply anova() to the resulting fitted linear model object in order to get the significance of additional variance explained by each term in the linear model. Such “nested model” setup is more appropriate for multivariate models than the independent t-test estimates reported by summary(). The latter may report two coefficients as significant while either of the two variables accounts for the same variance in the dependent variable, so adding them both to the model is useless. 
+
+d. Briefly comment on your findings. Is there any effect of %GC and if there is, is it big enough for us to worry? Note that in this problem we are performing an exploratory model-based statistical analysis with the “simplest-possible” being the main argument for the specific model used. While GC content can definitely affect hybridization and amplification efficiency (among other effects such as the different fluorescence efficiencies of the dyes or the detection sensitivity and accuracy in the corresponding optical channels), there is absolutely no rationale to believe that, biochemically, the dependence of measured expression levels on the GC content would be indeed linear, logarithmic, or anything in between. In this sense, we are running an “arbitrary” model (and I wonder if Dr Breiman would object) in order to get some idea about the presence of the effect in the data.
+```{r, error=TRUE}
+#loading libaries
+library(seqc)
+seqcounts=ILM_aceview_gene_AGR
+detach("package:seqc",unload=T)
+ercc.annot=read.table("https://assets.thermofisher.com/TFS-Assets/LSG/manuals/cms_095047.txt",as.is=T,header=T,row.names=NULL,sep="\t")
+ercc=read.table("https://assets.thermofisher.com/TFS-Assets/LSG/manuals/cms_095046.txt",as.is=T,header=T,row.names=NULL,sep="\t")
+ercc.table=merge(seqcounts[,1:5],ercc,by.x="Symbol",by.y="ERCC.ID")
+
+
+# a
+# removing A and T for percent
+n.total=nchar(ercc.annot$Sequence)
+# n.total
+# gsub("[AT]","",ercc.annot$Sequence)
+n.GT=nchar(gsub("[AT]","",ercc.annot$Sequence))
+N.GT=n.GT/nchar(ercc.annot$Sequence)
+N.GTP=n.GT/nchar(ercc.annot$Sequence)*100
+
+percent.GC=data.frame(GC.count=nchar(gsub("[AT]","",ercc.annot$Sequence))/nchar(ercc.annot$Sequence)*100)
+percent.GC
+
+N.GTP
+
+# b
+# log linear model
+
+l.Y=log(Y,base=2)
+l.X=log(X,base=2)
+l.Y[is.infinite(l.Y)]<-NA
+df.lXY=data.frame(l.Y,l.X)
+
+lm.lXYP=lm(l.Y~l.X*N.GTP,df.lXY,na.action=na.exclude)
+lm.lXYP
+
+# c
+# anova
+anova(lm.lXYP)
+
+
+```
+d.
+
+Looking at our  we notice that the log values are all different compared to the normal values when performing the linear model. In scientific terms, the larger values would be very difficult to retrieve results since the results from the instrument will be the same across. Not only that, the results will be skewed because there is an over abundence of sample across the board. This overcrowds the instrument thus skewing are results. This also explains why the results is the same across as our sample is spread out. In this case, we are looking to understand what is happening behind these results. In terms of statistical modeling, we are looking at these models to to look at our predictions, fit our data, and get a better idea of our next incoming data from in this case our  control. Statistical models are designed to give us an idea of what is to come with our next set of data. I also went through the liberty of seeing what the values may be if the percent was not multiplied by 100. This gives a change within our log values by 2 decimal places which can be pretty significant. This shows how important our statistical value needs to be as we need to be precise with our data and how to present it. 
+
+4. (25) As it was mentioned in passing in the Notes, spike-in controls can serve many purposes, one of them being the assessment of the sensitivity of the experiment. When sequencing the library, we are randomly picking fragments from it. The more we pick, the better chance there is to sequence even the rarest transcripts. Hence, more reads better sensitivity. How many is many enough? In the Notes we considered just one lane. Strictly speaking, we do not know how many reads were sequenced in that lane, we only know how many were aligned and assigned to annotated genes, but we will use this number as a proxy. Let the vector C be the vector of cumulative read counts, per gene, across multiple lanes L1, L2, …. The sum of such observed counts across all genes is the total number of reads N. The detection threshold T is the largest concentration of the ERCC control among all the controls that have zero observed counts in C. 
+
+a. Write R code (a simple loop would do) that computes vectors N and T corresponding to vectors C representing counts from just one lane, two lanes, three lanes, and so on. Start with the lane we looked at in the Notes (A_1_L01_FlowCellA) and include, one by one, all the lanes for the same sample/replicate A_1 (use only the seqcounts table, do not add data from other sequencing labs) - there will be two flowcells (A, B) with 8 lanes per each flowcell. 
+
+b. Plot T vs N (choose the scale if needed).
+
+
+```{r, error=TRUE}
+#a
+# load libaries
+library(seqc)
+library(dplyr)
+
+# acquire seq counts and control table
+seqcounts=ILM_aceview_gene_AGR
+detach("package:seqc",unload=T)
+ercc.annot=read.table("https://assets.thermofisher.com/TFS-Assets/LSG/manuals/cms_095047.txt",as.is=T,header=T,row.names=NULL,sep="\t")
+ercc=read.table("https://assets.thermofisher.com/TFS-Assets/LSG/manuals/cms_095046.txt",as.is=T,header=T,row.names=NULL,sep="\t")
+ercc.table=merge(seqcounts[,1:5],ercc,by.x="Symbol",by.y="ERCC.ID")
+
+
+
+# find cumulative sum of each sample per lane
+A_1_FlowCellA<-cbind(seqcounts[,c(5,7,9,11,13,15,17,19)])
+A_1_FlowCellB<-cbind(seqcounts[,c(6,8,10,12,14,16,18,20)])
+A_1_FlowCellT<-cbind(seqcounts[,c(5:20)])
+
+A_1_Count_FlowCellA<-apply(seqcounts[,c(5,7,9,11,13,15,17,19)], 1, sum)
+A_1_Count_FlowCellB<-apply(seqcounts[,c(6,8,10,12,14,16,18,20)], 1, sum)
+
+
+# Finding N
+N<-sum(A_1_FlowCellT)
+N1<-cbind(seqcounts[1:4],N)
+N2<-merge(N1,ercc,by.x="Symbol",by.y="ERCC.ID")
+
+# Merging FC with ERCC
+A1.FC<-cbind(seqcounts[1:4],A_1_FlowCellT)
+A1.FCm<-merge(A1.FC,ercc,by.x="Symbol",by.y="ERCC.ID")
+
+# filter out tagged controls
+
+y3<-A1.FC %>% filter(!Symbol %in% A1.FCm$Symbol)
+
+# remove 0
+y4<-y3[apply(A1.FC!=0,1,all),]
+sy4<-numeric
+t<-numeric
+# find threshold, max, min of samples
+for(i in y4[5:20]){
+  sy4<-sqrt(i)
+  t<-log(sy4)
+  # Control
+  is.na(t)<-sapply(t, is.infinite)
+  t[is.na(t)]<-0
+}
+
+t<-cbind(y4[1:4],t)
+t<-t[t$t!=0,]
+min.t<-min(t$t)
+max.t<-max(t$t)
+
+min.t
+max.t
+# tc<-data.frame(tc=apply(t[5],1,sum))
+# t.t<-cbind(t,tc)
+# t.t
+
+# filter T and N
+T1 <- t%>% filter(!Symbol %in% N2$Symbol)
+
+#b
+# plot graph
+plot(T1,N1)
+```
+

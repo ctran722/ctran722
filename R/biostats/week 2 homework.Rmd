@@ -1,0 +1,376 @@
+---
+title: "Homework 2"
+author: "Christopher Tran"
+date: "10/14/2021"
+output: word_document
+editor_options: 
+  chunk_output_type: inline
+---
+Goal
+Explore the notion of chance and how it applies to significance measures. Experiment  with simulation studies using theoretical normal distribution. Understand the role of assumptions made by specific tests (i.e. t-test). (Numbers in parenthesis show grade  breakdown: the contribution of each part of the homework to the total grade of 100.)
+
+1. (40) Using simulation based on rnorm, study the performance of “unbiased” estimator of standard deviation (using n-1 in denominator) and two nearest “alternatives” that use “n” or “n-2” in the denominator instead
+```{r Go over samples ranging in size from 2 to 20}
+# using created standard deviation function changing the denominator
+
+my.sd <- function (x){
+  #setting variable to create average
+  sum<-0
+  num<-0
+  #beginning for loop for average
+  for (y in x){
+    sum<-sum+y
+    num <- num + 1
+  }  
+  ave <- sum/num
+  var <- 0
+  #beginning for loop  to create portion of square root equation
+  for (y in x){
+    var <- var + (y-ave)^2
+  }
+  #standard deviation equation
+  var <- var/(num)
+  sqrt(var)
+}
+#created function of standard deviation
+my.sd(2:20)
+#using R built standard deviation to compare
+sd(2:20)
+
+
+my.sd2 <- function (x){
+  #setting variable to create average
+  sum<-0
+  num<-0
+  #beginning for loop for average
+  for (y in x){
+    sum<-sum+y
+    num <- num + 1
+  }  
+  ave <- sum/num
+  var <- 0
+  #beginning for loop  to create portion of square root equation
+  for (y in x){
+    var <- var + (y-ave)^2
+  }
+  #standard deviation equation
+  var <- var/(num-2)
+  sqrt(var)
+}
+#created function of standard deviation
+my.sd2(2:20)
+#using R built standard deviation to compare
+sd(2:20)
+
+
+
+```
+
+```{r for each sample size n, draw multiple (say, N=1000) samples of that size from normal distribution with zero mean and standard deviation of one}
+# create loop for function to draw multiple samples
+n<-1000
+sampsize<-20
+
+for (size in 2:sampsize){
+  for (idn in 1:n){
+    x<-rnorm(size,mean=0,sd=1)
+    
+  }
+}
+print(x)
+
+
+```
+
+```{r for each such sample calculate (a) standard deviation within the sample; (b)biased sd alternative that uses n instead of n-1 in the denominator; c) sd alternative that uses n-2 in denominator (write functions, if needed, to calculate what you need}
+
+#use standard deviation function
+n<-1000
+sampsize<-20
+
+mx<-matrix(0,nrow=n, ncol=sampsize)
+mx1<-matrix(0,nrow=n,ncol=sampsize)
+mx2<-matrix(0, nrow=n,ncol=sampsize)
+
+
+for (size in 2:sampsize){
+  for (idn in 1:n){
+    x<-rnorm(size,mean=0,sd=1)
+    xsd<- sd(x)
+    xsd1<- my.sd(x)
+    xsd2<- my.sd2(x)
+    
+    mx[idn,size]<-xsd
+    mx1[idn,size]<-xsd1
+    mx2[idn,size]<-xsd2
+
+  }
+}
+
+print(mx)
+print(mx1)
+print(mx2)
+```
+
+```{r at this point, for each sample you have three estimators calculated, let’s call them s, s.n, s.n.1. Remember that they are functions of the (random) sample they are calculated for, and hence they are random variables themselves. We want to know how well each of them approximates the true underlying standard deviation (which we happen to know, because we simulate by drawing from a known, defined distribution). In order to accomplish this calculate the mean and spread of each of these three standard deviation estimates across all N samples for the current sample size n}
+
+# use standard deviation dataset to calcuate mean *standard deviation + standard deviation
+# matrix application to find mean and standard deviation dataset
+s<-apply(mx,2,mean)
+s.sd<-apply(mx,2,sd)
+print(s)
+print(s.sd)
+
+s.n<-apply(mx1,2,mean)
+s.n.sd<- apply(mx1,2,sd)
+
+print(s.n)
+print(s.n.sd)
+
+s.n1<-apply(mx2,2,mean)
+s.n.sd1<- apply(mx2,2,sd)
+
+print(s.n1)
+print(s.n.sd1)
+```
+
+```{r Plot the calculated means and spreads of all three estimators of the standard deviation as functions of sample size n, observe how they approach standard deviation of the underlying distribution (we know it is 1 since this is what we used to generate the data!), describe your observations in plain English (Hints: R function points may prove useful: remember also that you can use plot with parameter type=”n” to create blank plot of the size required for the data to fit and then add data series one at a time using points).}
+
+# plots
+plot(s, s.sd, main="original standard deviation")
+plot(s.n,s.n.sd, main="stanard deviation S")
+plot(s.n1,s.n.sd1, main ="standard deviation -2")
+
+
+```
+observe how they approach standard deviation of the underlying distribution (we know it is 1 since this is what we used to generate the data!), describe your observations in plain English
+
+We have three data plots using the 3 standard deviations. One standard deviation was with the n-1 denominator(normal first graph), another was a standard deviation,denominator of just n, and the last one is the standard deviation of the denominator n-2. Looking at the graphs of all three we can see that the line of samples it is closes is close to 1 which in this case would be the mean if we were to compare graphs and results. Comparing each one the denominator this is just to show how close of a curve the n-1 showing us that this data is much more accurate in a smaller dataset. As we go into small data sets, this will becoming small and close to N which is not a problem with a bigger sample size. The -2 shows how much of an error it is as it is going in the opposite direction. the N graph just shows how farther away from the original one.
+
+
+
+2. (40) Study the behavior of t-test under the null hypothesis using numerical rmsimulation
+
+```{r For a normal distribution with arbitrarily chosen mean and variance (e.g., 2 and 3) draw two samples of different sizes (e.g. 5 and 7), calculate the difference between samples' means and also the p-value of t-test run on the same two samples}
+n1<-5
+n2<-7
+sd<-sqrt(3)
+m<-2
+
+# creating matrix
+f<- rnorm(n1,2,sd)
+print(f)
+fm<-matrix(f)
+fmm<-apply(fm,2,mean)
+print(fmm)
+
+f2<- rnorm(n2,2,sd)
+print(f2)
+f2m<-matrix(f2)
+f2mm<-apply(f2m,2,mean)
+print(f2mm)
+
+#t test then can find pvalue
+difmean<-fmm-f2mm
+print(difmean)
+
+#ttest
+t= (difmean)/(sd/sqrt(n1+n2))
+print(t)
+
+#two sample pvalue
+2*pt(-abs(t),df=n-1)
+
+#one sample pvaule
+pt(-abs(t),df=n-1)
+
+#  pvalue function
+pt(f2mm,df = 1)
+pt(fmm,df = 1)
+pt(difmean,df=1)
+
+```
+
+```{r then repeat this large number of times (e.g. N=10^4). From the differences between means obtained in those resamplings, calculate the brute-force p-value of each of those N differences, using the rank of that particular difference among all N differences obtained in the simulation (similar to what we did in class – after 10K resamplings you already have 10K differences observed; rank each particular difference in this list against the others: for instance, if the difference is second largest in the whole set, then only once out of 10000 trials was a larger difference observed, so the one-sided p-value determined from such brute force simulation is 2/10000)}
+n1<-5
+n2<-7
+v<-3
+standd<-sqrt(v)
+m<-2
+n<-10000
+# creating rnorm with matrix
+fn<- rnorm(n*(n1+n2),mean=2,sd=sqrt(3))
+# print(fn)
+fnm <- matrix(fn,ncol=(n1+n2),nrow=n)
+# print(fnm)
+# function for difference in mean
+dmean <- function(x) mean(x[1:n1])-mean(x[(1+n1):(n1+n2)])
+dfnm<-apply(fnm,1,dmean)
+
+# pvalue function
+pv <- function(x)t.test(x[1:n1],x[(1+n1):(n1+n2)])$p.value
+fnmpv<- apply(fnm,1,pv)
+# print(fnmpv)
+
+#t-test 
+brtt <- (-abs(dfnm))/length(dfnm)
+# print(brpv)
+
+#changing n to 20 and 28 
+n21<-20
+n22<-28
+v<-3
+standd<-sqrt(v)
+m<-2
+n<-10000
+
+f1n<- rnorm(n*(n21+n22),mean=2,sd=sqrt(3))
+# print(f1n)
+
+f1nm <- matrix(f1n,ncol=(n21+n22),nrow=n)
+# print(f1nm)
+
+# difference mean function
+d1mean <- function(x) mean(x[1:n21])-mean(x[(1+n21):(n21+n22)])
+d1fnm<-apply(f1nm,1,d1mean)
+
+# pvalue function
+p1v <- function(x)t.test(x[1:n21],x[(1+n21):(n21+n22)])$p.value
+
+f1nmpv<- apply(f1nm,1,p1v)
+print(f1nmpv)
+
+# ttest
+b1rpv <- (-abs(d1fnm))/length(d1fnm)
+print(b1rpv)
+```
+
+```{r Plot: (a) the distribution of differences observed in all the resamplings (b) the distribution of t-test p-values obtained for the pairs of samples in each resampling. (c) the distribution of brute force p-values obtained for the pairs of samples in each resampling. (d) generate a scatter plot of t-test p-values versus the differences between the means in each pair of samples drawn (e) a scatter plot of brute force p-values versus the differences between the means (in a scatterplot, each point should represent a single resampling experiment, x-axis=difference, y-axis=p-value) (f) a scatter plot of t-test p-values vs brute force p-values.Hint: mind the difference between one-sided and two-sided tests!!! It does not matter whether you choose one-sided or two sided, but you have to be consistent in your comparison of t-test vs brute force resampling}
+# (a) the distribution of differences observed in all the resamplings
+(hist(dfnm),main="distribution of differences")
+(hist(d1fnm),main="distribution of differences")
+# (b) the distribution of t-test p-values obtained for the pairs of samples in each resampling.
+(hist(fnmpv),main="distribution of ttest")
+(hist(f1nmpv),main="distribution of ttest")
+# (c) the distribution of brute force p-values obtained for the pairs of samples in each resampling.
+(hist(brpv),main="brute force pvalue")
+(hist(b1rpv),main="brute force pvalue")
+# (d) generate a scatter plot of t-test p-values versus the differences between the means in each pair of samples drawn
+plot(dfnm,fnmpv,xlab="difference between mean",ylab="pvaules",main="pvalue vs difference between means")
+plot(d1fnm,f1nmpv,xlab="difference between mean",ylab="pvaules",main="pvalue vs difference between means")
+# (e) a scatter plot of brute force p-values versus the differences between the means (in a scatterplot, each point should represent a single resampling experiment, x-axis=difference, y-axis=p-value). 
+plot(dfnm,brpv,xlab="difference of mean",ylab="pvaules",main="pvalue vs difference between means")
+plot(d1fnm,b1rpv,xlab="difference of mean",ylab="pvaules",main="pvalue vs difference between means")
+# (f) a scatter plot of t-test p-values vs brute force p-values.
+plot(fnmpv,brpv,xlab="ttest",main="ttest scatterplot")
+plot(f1nmpv,b1rpv,xlab="ttest",main="ttest scatterplot")
+
+
+```
+Explain your results in writing. Repeat this study for 4 times larger sample sizes (e.g. 20 and 28 – it is a good idea to wrap your whole resampling code in a function, so that you can just call it again with new parameters, e.g.resample(20,28), so that you don’t have to write any additional code! Or even simpler, you can save all your code in a script file, start it with assignment of variables n1, n2 for the sample sizes, and use n1 and n2 everywhere in the code where the sample size is needed; then for the second run edit your script to set n1=20; n2=28 and source() it to re-run everything). Observe and explain how improvement in variance estimate with increased sample size improves agreement between simulated and calculated probability estimates.
+
+Looking at the graphs and comparing each one, it shows that each one are pretty comparable when resampling the n Values. The only difference would be the n samples are more appearance due to the increase in size in terms of n being changed. Looking at both methods, it shows that they are very similar so we can trust the R to calculate what we need from it with the functions. It is also good to note if we need to change anything within the functions, it is best to create the functions to gain a better of standing of the data set and potentially manipulate the date set with a minor/major change to the function similar to the standard deviation function that was created. 
+
+3. (30) Using rnorm create two samples that result in insignificant t-test p-value, but represent two very different processes (Hint: if one sample comes from standard normal distribution (with mean zero and sd of one) and another comes from the union of two normal distributions with means symmetrically mirrored on each side of zero (e.g. -10 and 10), then both distributions willhave their means equal to zero).
+
+```{r (a) Plot the two distributions you have come up with.(b) Repeat the following multiple times: draw one sample from each of the two distributions you chose, calculate t-test p-value between such two samples. Plot the resulting distribution of p-values obtained across multiple trials, consider what it tells us and how consistent it is with what exactly t-test is testing for. Describe the results in plain English.}
+# a) Plot the two distributions you have come up with
+n<-20
+symmean <-10
+
+norm<-rnorm(2*n)
+odd<-c(rnorm(n,mean = symmean),rnorm(n,mean= -symmean))
+
+hist(norm,main="normal")
+
+hist(odd,main="odd")
+
+
+# (b) Repeat the following multiple times: draw one sample from each of the two distributions you chose, calculate t-test p-value between such two samples. Plot the resulting distribution of p-values obtained across multiple trials, consider what it tells us and how consistent it is with what exactly t-test is testing for. Describe the results in plain English.
+
+
+# loop for each sample for pvalue
+pval<-0
+for ( s in 1:n ) { 
+ norm1 <- rnorm(2*n) 
+ odd1 <- c(rnorm(n,symmean),rnorm(n,-symmean))
+ pval[s] <- t.test(norm1,odd1)$p.value
+}
+# print(pval)
+
+# plot graphs with values
+
+(hist(pval,main="pvalue"))
+(hist(norm1,main="normal"))
+(hist(odd1,main="odd"))
+
+
+```
+Describe the results in plain English.
+
+Looking at my results, i can see that the pvalue is moving towards an upward trend towards 1. It reminds me similar to the first half of the bell curve when looking at this. The normal graph if looked at a larger view, shows similar to the full bell curve. Now looking at the last graph which had two different types of samples, this looks to be like a curved graph, or two tails of the bell curve. This may have been due to the fact that the exercise was to put two distributions in the this function which results in the graphs. I think if the sample size was bigger, we can visually see a better graph.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
